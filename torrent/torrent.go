@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AcidOP/torrly/peers"
 	"github.com/jackpal/bencode-go"
 )
 
@@ -99,7 +98,7 @@ func (t *Torrent) StartDownload() {
 		// 	fmt.Println("Failed to handshake with peer:", p.IP, "on port", p.Port, "-", err)
 		// 	continue
 		// }
-		peers.HandshakePeer(p, string(t.InfoHash[:]), t.PeerId)
+		p.HandshakePeer(string(t.InfoHash[:]), t.PeerId)
 	}
 }
 

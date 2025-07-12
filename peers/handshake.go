@@ -19,7 +19,7 @@ type Handshake struct {
 	pReserved string
 }
 
-func HandshakePeer(p Peer, iHash, peerId string) error {
+func (p Peer) HandshakePeer(iHash, peerId string) error {
 	c, err := p.ConnPeer()
 	if err != nil {
 		return err
