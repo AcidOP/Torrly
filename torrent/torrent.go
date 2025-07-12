@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/AcidOP/torrly/peers"
 	"github.com/jackpal/bencode-go"
 )
 
@@ -18,6 +19,8 @@ type Torrent struct {
 	PieceLength int
 	Length      int
 	Name        string
+	PeerId      string // Our own Peer ID, used for handshakes.
+	Port        int    // Port we listen on for incoming connections
 }
 
 type bInfo struct {
@@ -32,6 +35,11 @@ type bTorrent struct {
 	Info     bInfo  `bencode:"info"`
 }
 
+const (
+	PeerID = "-TRLY01-9a8b7c6d5e4f"
+	Port   = 6881
+)
+
 func NewTorrentFromFile(path string) (*Torrent, error) {
 	f, err := parseTorrentFromPath(path)
 	if err != nil {
@@ -43,7 +51,6 @@ func NewTorrentFromFile(path string) (*Torrent, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &tf, nil
 }
 
@@ -77,22 +84,27 @@ func (t *Torrent) ViewTorrent() {
 	fmt.Printf("File size: %s\n", displaySize)
 	fmt.Printf("Piece length: %d KB\n", t.PieceLength/1024)
 	fmt.Printf("Num pieces: %d\n", t.PieceLength/20)
-	fmt.Printf("Info Hash: %x\n", t.InfoHash)
+	fmt.Printf("Info Hash: %x\n\n", t.InfoHash)
 }
 
 func (t *Torrent) StartDownload() {
-	peers, err := t.FetchPeers()
+	pArr, err := t.FetchPeers()
 	if err != nil {
 		panic(err)
 	}
 
-	for i, p := range peers {
-		fmt.Printf("[%d] IP: %s\t\tPort:%d\n", i, p.IP.String(), p.Port)
+	for _, p := range pArr {
+		// err := peers.HandshakePeer(p, string(t.InfoHash[:]), t.PeerId)
+		// if err != nil {
+		// 	fmt.Println("Failed to handshake with peer:", p.IP, "on port", p.Port, "-", err)
+		// 	continue
+		// }
+		peers.HandshakePeer(p, string(t.InfoHash[:]), t.PeerId)
 	}
 }
 
-// Takes a path as an argument and checks if the file is a .torrent file
-// Then reads the file and a pointer to the file
+// Takes a path as an argument and checks if the file is a .torrent file.
+// Then reads the file and a pointer to the file.
 func parseTorrentFromPath(path string) (*os.File, error) {
 	f, err := os.Stat(path)
 	if os.IsNotExist(err) {
@@ -108,7 +120,6 @@ func parseTorrentFromPath(path string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return file, nil
 }
 
@@ -140,6 +151,8 @@ func metaFromFile(f *os.File) (Torrent, error) {
 		PieceLength: bt.Info.PieceLength,
 		Length:      bt.Info.Length,
 		Name:        bt.Info.Name,
+		PeerId:      PeerID,
+		Port:        Port,
 	}
 	return t, nil
 }

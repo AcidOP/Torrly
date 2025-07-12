@@ -35,8 +35,8 @@ func (t Torrent) buildTrackerURL() (string, error) {
 
 	params := url.Values{
 		"info_hash":  []string{string(t.InfoHash[:])},
-		"peer_id":    []string{"-TRLY01-9a8b7c6d5e4f"},
-		"port":       []string{"6881"},
+		"peer_id":    []string{t.PeerId},
+		"port":       []string{strconv.Itoa(t.Port)},
 		"uploaded":   []string{"0"},
 		"downloaded": []string{"0"},
 		"left":       []string{strconv.Itoa(t.Length)},
