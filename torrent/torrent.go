@@ -55,9 +55,9 @@ func NewTorrentFromFile(path string) (*Torrent, error) {
 }
 
 // Calculate the SHA1 hash of the bencoded info dictionary.
-func (i *bInfo) hash() [20]byte {
+func (i bInfo) hash() [20]byte {
 	infoBytes := bytes.Buffer{}
-	if err := bencode.Marshal(&infoBytes, *i); err != nil {
+	if err := bencode.Marshal(&infoBytes, i); err != nil {
 		panic("failed to marshal info: " + err.Error())
 	}
 
@@ -68,10 +68,9 @@ func (i *bInfo) hash() [20]byte {
 // (e.g. announce URL, file name, size, piece length, number of pieces, info hash)
 func (t *Torrent) ViewTorrent() {
 	var displaySize string
-	s := t.Length / (1024 * 1024)
 
 	// Format the size in GB, MB, or KB
-	if s >= 1024 {
+	if s := t.Length / (1024 * 1024); s >= 1024 {
 		displaySize = fmt.Sprintf("%.2f GB", float64(s)/1024)
 	} else if s >= 1 {
 		displaySize = fmt.Sprintf("%.2f MB", float64(s))
@@ -88,26 +87,33 @@ func (t *Torrent) ViewTorrent() {
 }
 
 func (t *Torrent) StartDownload() {
-	pArr, err := t.FetchPeers()
+	pArr, err := t.GetAvailablePeers()
 	if err != nil {
 		panic(err)
 	}
 
-	for _, p := range pArr {
-		// err := peers.HandshakePeer(p, string(t.InfoHash[:]), t.PeerId)
-		hShake, err := p.HandshakePeer(string(t.InfoHash[:]), t.PeerId)
-		if err != nil {
-			fmt.Println("Failed to handshake with peer:", p.IP, "on port", p.Port, "-", err)
+	handshake := peers.NewHandshake(string(t.InfoHash[:]), t.PeerId)
+
+	for i, p := range pArr {
+		conn, err := p.ConnectToPeer()
+		if err != nil || conn == nil {
+			continue
+		}
+		defer conn.Close()
+
+		pHandshake, _ := handshake.ExchangeHandshake(conn)
+		if pHandshake == nil {
+			fmt.Printf("\n[%d] Failed to exchange handshake with peer: %s", i, p.IP.String())
 			continue
 		}
 
-		_, err = peers.DecodeHandshake(hShake)
-		if err != nil {
-			fmt.Println("failed to verify handshake: ", err)
-			continue
-		}
+		matched := handshake.VerifyHandshake(pHandshake)
 
-		fmt.Println()
+		fmt.Printf("\n[%d] Connected to peer: %s", i, p.IP.String())
+		fmt.Println("\nPeer sent handshake: ", string(pHandshake))
+		if matched {
+			fmt.Println("Handshake Matched")
+		}
 	}
 }
 

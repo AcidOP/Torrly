@@ -34,12 +34,12 @@ func (t Torrent) buildTrackerURL() (string, error) {
 	}
 
 	params := url.Values{
-		"info_hash":  []string{string(t.InfoHash[:])},
-		"peer_id":    []string{t.PeerId},
-		"port":       []string{strconv.Itoa(t.Port)},
-		"uploaded":   []string{"0"},
-		"downloaded": []string{"0"},
-		"left":       []string{strconv.Itoa(t.Length)},
+		"info_hash":  {string(t.InfoHash[:])},
+		"peer_id":    {t.PeerId},
+		"port":       {strconv.Itoa(t.Port)},
+		"uploaded":   {"0"},
+		"downloaded": {"0"},
+		"left":       {strconv.Itoa(t.Length)},
 	}
 
 	base.RawQuery = params.Encode()
@@ -48,7 +48,7 @@ func (t Torrent) buildTrackerURL() (string, error) {
 
 // Announce to the tracker to get a list of peers
 // Returns a map of peers with their IP addresses and ports
-func getTrackerResponse(t Torrent) ([]byte, error) {
+func (t *Torrent) getTrackerResponse() ([]byte, error) {
 	trackerURL, err := t.buildTrackerURL()
 	if err != nil {
 		return nil, err
@@ -72,8 +72,8 @@ func getTrackerResponse(t Torrent) ([]byte, error) {
 }
 
 // Returns a list of peers from the tracker
-func (t Torrent) FetchPeers() ([]peers.Peer, error) {
-	res, err := getTrackerResponse(t)
+func (t Torrent) GetAvailablePeers() ([]peers.Peer, error) {
+	res, err := t.getTrackerResponse()
 	if err != nil {
 		return nil, err
 	}

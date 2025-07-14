@@ -3,12 +3,18 @@ package peers
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	"io"
+	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
-const HASH_LENGTH = 68
+const (
+	HASH_LENGTH     = 68
+	PROTOCOL_LENGTH = 19
+	PROTOCOL_STRING = "BitTorrent protocol"
+)
 
 // https://wiki.theory.org/BitTorrentSpecification#Handshake
 type Handshake struct {
@@ -19,21 +25,19 @@ type Handshake struct {
 	pReserved string
 }
 
-func (p Peer) HandshakePeer(iHash, peerId string) ([]byte, error) {
-	c, err := p.ConnectToPeer()
-	if err != nil {
-		return nil, err
-	}
-	defer c.Close()
-
-	h := Handshake{
-		pLength:   19, // Decimal 19
-		pStr:      "BitTorrent protocol",
-		pReserved: "\x00\x00\x00\x00\x00\x00\x00\x00",
-		InfoHash:  iHash,
+func NewHandshake(infoHash, peerId string) *Handshake {
+	return &Handshake{
+		pLength:   PROTOCOL_LENGTH,
+		pStr:      PROTOCOL_STRING,
+		pReserved: strings.Repeat("\x00", 8),
+		InfoHash:  infoHash,
 		pId:       peerId,
 	}
+}
 
+// Takes a Connection (to another peer) as an argument and sends our handshake.
+// Then waits for the peer to respond with its handshake and return it
+func (h Handshake) ExchangeHandshake(connPeer net.Conn) ([]byte, error) {
 	hBuf := bytes.Buffer{}
 	hBuf.WriteByte(byte(h.pLength)) // pstrlen (1 byte)
 	hBuf.WriteString(h.pStr)        // pstr (19 bytes)
@@ -44,29 +48,24 @@ func (p Peer) HandshakePeer(iHash, peerId string) ([]byte, error) {
 	hBytes := hBuf.Bytes() // 1 + 19 + 8 + 20 + 20 = 68 bytes
 
 	if len(hBytes) != HASH_LENGTH {
-		return nil, errors.New("handshake byte length is not 68 bytes, got: " + strconv.Itoa(len(hBytes)))
+		return nil, errors.New("handshake byte length is expected 68 bytes, got: " + strconv.Itoa(len(hBytes)))
 	}
 
 	// fmt.Printf("\nSending Handshake: %x\n", hBytes)
 
-	if _, err := c.Write(hBytes); err != nil {
+	if _, err := connPeer.Write(hBytes); err != nil {
 		return nil, errors.New("failed to send handshake: " + err.Error())
 	}
 
-	// Allow the peer 5 second time to send a hash back.
-	if err = c.SetReadDeadline(time.Now().Add(time.Second * 5)); err != nil {
-		fmt.Println("failed to set read deadline:", err)
-		return nil, err
-	}
+	connPeer.SetReadDeadline(time.Now().Add(time.Second * 5))
 
-	// Accept a handshake from peer
-	buf := make([]byte, HASH_LENGTH)
-	if _, err = c.Read(buf); err != nil || len(buf) != HASH_LENGTH {
+	received := make([]byte, HASH_LENGTH)
+	if _, err := io.ReadFull(connPeer, received); err != nil {
 		return nil, errors.New("invalid handshake response from peer: " + err.Error())
 	}
 
 	// fmt.Printf("\nReceived following handshake %s\n", buf)
-	return buf, nil
+	return received, nil
 }
 
 // Decode a Handshake sent by another Peer
@@ -87,23 +86,19 @@ func DecodeHandshake(buf []byte) (*Handshake, error) {
 		return nil, errors.New("invalid handshake protocol string")
 	}
 
-	fmt.Println("Length:", h.pLength)
-	fmt.Println("Protocol String:", h.pStr)
-	fmt.Println("Reserved:", h.pReserved)
-	fmt.Printf("Info Hash: %x\n", h.InfoHash)
-	fmt.Println("Peer ID:", h.pId)
-
-	fmt.Println()
-
 	return &h, nil
 }
 
-func ValidateHandshake(h1, h2 *Handshake) bool {
-	if h1.pLength != h2.pLength ||
-		h1.pStr != h2.pStr ||
-		h1.pReserved != h2.pReserved ||
-		h1.InfoHash != h2.InfoHash ||
-		h1.pId != h2.pId {
+func (h *Handshake) VerifyHandshake(raw []byte) bool {
+	h2, err := DecodeHandshake(raw)
+	if err != nil {
+		return false
+	}
+
+	if h2.pLength != PROTOCOL_LENGTH ||
+		h2.pStr != PROTOCOL_STRING ||
+		len(h2.pReserved) != 8 ||
+		h.InfoHash != h2.InfoHash {
 		return false
 	}
 	return true
