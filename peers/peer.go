@@ -7,9 +7,20 @@ import (
 )
 
 type Peer struct {
-	IP     net.IP // IP address of the peer in binary format.
-	Port   int    // Port number of the peer to connect to.
+	IP     net.IP
+	Port   int
 	PeerId string // (Optional) ID of the Peer
+	Choked bool
+}
+
+type PeerManager struct {
+	Peers          []Peer
+	ConnectedPeers []Peer
+}
+
+func NewPeerManager() *PeerManager {
+	peers := []Peer{}
+	return &PeerManager{Peers: peers}
 }
 
 // COnnect to the associated peer using its IP and Port.

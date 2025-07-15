@@ -55,18 +55,14 @@ func (t *Torrent) getTrackerResponse() ([]byte, error) {
 	}
 
 	resp, err := http.Get(trackerURL)
-	if err != nil {
+	if err != nil || resp.StatusCode != http.StatusOK {
 		return nil, errors.New("failed to connect to tracker")
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("tracker returned non-200 status code: " + resp.Status)
-	}
-
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.New("failed to read response: " + err.Error())
+		return nil, errors.New("failed to read tracker response: " + err.Error())
 	}
 	return data, nil
 }
@@ -85,15 +81,8 @@ func (t Torrent) GetAvailablePeers() ([]peers.Peer, error) {
 
 	pArr := []peers.Peer{}
 	for _, p := range tr.Peers {
-		ip := net.ParseIP(p.IP)
-
-		// Filter out malformed Peers
-		if ip.String() == "<nil>" || p.Port == 0 {
-			continue
-		}
-
 		pArr = append(pArr, peers.Peer{
-			IP:     ip,
+			IP:     net.ParseIP(p.IP),
 			Port:   p.Port,
 			PeerId: p.PeerId,
 		})

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AcidOP/torrly/peers"
+	"github.com/AcidOP/torrly/handshake"
 	"github.com/jackpal/bencode-go"
 )
 
@@ -92,7 +92,7 @@ func (t *Torrent) StartDownload() {
 		panic(err)
 	}
 
-	handshake := peers.NewHandshake(string(t.InfoHash[:]), t.PeerId)
+	handshake := handshake.NewHandshake(string(t.InfoHash[:]), t.PeerId)
 
 	for i, p := range pArr {
 		conn, err := p.ConnectToPeer()
