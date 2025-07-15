@@ -1,26 +1,67 @@
 package peers
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/AcidOP/torrly/handshake"
+	"github.com/AcidOP/torrly/messages"
 )
 
 type Peer struct {
 	IP     net.IP
 	Port   int
-	PeerId string // (Optional) ID of the Peer
 	Choked bool
+	PeerId string // (Optional)
+	conn   net.Conn
 }
 
 type PeerManager struct {
-	Peers          []Peer
-	ConnectedPeers []Peer
+	peers          []Peer
+	infoHash       string
+	peerId         string
+	connectedPeers []*Peer
 }
 
-func NewPeerManager() *PeerManager {
-	peers := []Peer{}
-	return &PeerManager{Peers: peers}
+func NewPeerManager(peers []Peer, infoHash, peerId string) *PeerManager {
+	return &PeerManager{peers: peers, infoHash: infoHash, peerId: peerId}
+}
+
+func (pm *PeerManager) HandlePeers() {
+	hs := handshake.NewHandshake(pm.infoHash, pm.peerId)
+
+	for i := range pm.peers {
+		p := &pm.peers[i]
+
+		conn, err := p.ConnectToPeer()
+		if err != nil || conn == nil {
+			continue
+		}
+
+		pHandshake, err := hs.ExchangeHandshake(conn)
+		if err != nil || pHandshake == nil {
+			fmt.Printf("\nFailed to exchange handshake with peer: %s", p.IP.String())
+			conn.Close()
+			continue
+		}
+
+		matched := hs.VerifyHandshake(pHandshake)
+
+		if matched {
+			pm.connectedPeers = append(pm.connectedPeers, p)
+			p.conn = conn
+			p.exchangeMessages()
+		}
+	}
+}
+
+func (p Peer) exchangeMessages() {
+	fmt.Println("\n\nStarting communication with peer: ", p.IP.String())
+
+	messages.ReceivePeerMessage(p.conn)
+	p.conn.Close()
 }
 
 // COnnect to the associated peer using its IP and Port.

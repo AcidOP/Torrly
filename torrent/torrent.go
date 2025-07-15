@@ -8,14 +8,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AcidOP/torrly/handshake"
+	"github.com/AcidOP/torrly/peers"
 	"github.com/jackpal/bencode-go"
 )
 
+type hash = [20]byte
+
 type Torrent struct {
 	Announce    string
-	InfoHash    [20]byte
-	PieceHashes [][20]byte
+	InfoHash    hash
+	PieceHashes []hash
 	PieceLength int
 	Length      int
 	Name        string
@@ -23,16 +25,16 @@ type Torrent struct {
 	Port        int    // Port we listen on for incoming connections
 }
 
-type bInfo struct {
+type bcodeInfo struct {
 	Pieces      string `bencode:"pieces"`
 	PieceLength int    `bencode:"piece length"`
 	Length      int    `bencode:"length"`
 	Name        string `bencode:"name"`
 }
 
-type bTorrent struct {
-	Announce string `bencode:"announce"`
-	Info     bInfo  `bencode:"info"`
+type bcodeTorrent struct {
+	Announce string    `bencode:"announce"`
+	Info     bcodeInfo `bencode:"info"`
 }
 
 const (
@@ -41,27 +43,17 @@ const (
 )
 
 func NewTorrentFromFile(path string) (*Torrent, error) {
-	f, err := parseTorrentFromPath(path)
+	file, err := parseTorrentFromPath(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer file.Close()
 
-	tf, err := metaFromFile(f)
+	torrentFile, err := metaFromFile(file)
 	if err != nil {
 		return nil, err
 	}
-	return &tf, nil
-}
-
-// Calculate the SHA1 hash of the bencoded info dictionary.
-func (i bInfo) hash() [20]byte {
-	infoBytes := bytes.Buffer{}
-	if err := bencode.Marshal(&infoBytes, i); err != nil {
-		panic("failed to marshal info: " + err.Error())
-	}
-
-	return sha1.Sum(infoBytes.Bytes())
+	return torrentFile, nil
 }
 
 // Visualize information about the torrent.
@@ -82,8 +74,12 @@ func (t *Torrent) ViewTorrent() {
 	fmt.Printf("File name: %s\n", t.Name)
 	fmt.Printf("File size: %s\n", displaySize)
 	fmt.Printf("Piece length: %d KB\n", t.PieceLength/1024)
-	fmt.Printf("Num pieces: %d\n", t.PieceLength/20)
+	fmt.Printf("Number of pieces: %d\n", len(t.PieceHashes))
 	fmt.Printf("Info Hash: %x\n\n", t.InfoHash)
+
+	fmt.Printf("\n\nPiece hashes 1: %x", t.PieceHashes[0])
+	fmt.Printf("\nPiece hashes 2: %x", t.PieceHashes[1])
+	fmt.Printf("\nPiece hashes 3: %x", t.PieceHashes[2])
 }
 
 func (t *Torrent) StartDownload() {
@@ -92,29 +88,8 @@ func (t *Torrent) StartDownload() {
 		panic(err)
 	}
 
-	handshake := handshake.NewHandshake(string(t.InfoHash[:]), t.PeerId)
-
-	for i, p := range pArr {
-		conn, err := p.ConnectToPeer()
-		if err != nil || conn == nil {
-			continue
-		}
-		defer conn.Close()
-
-		pHandshake, _ := handshake.ExchangeHandshake(conn)
-		if pHandshake == nil {
-			fmt.Printf("\n[%d] Failed to exchange handshake with peer: %s", i, p.IP.String())
-			continue
-		}
-
-		matched := handshake.VerifyHandshake(pHandshake)
-
-		fmt.Printf("\n[%d] Connected to peer: %s", i, p.IP.String())
-		fmt.Println("\nPeer sent handshake: ", string(pHandshake))
-		if matched {
-			fmt.Println("Handshake Matched")
-		}
-	}
+	pm := peers.NewPeerManager(pArr, string(t.InfoHash[:]), t.PeerId)
+	pm.HandlePeers()
 }
 
 // Takes a path as an argument and checks if the file is a .torrent file.
@@ -139,26 +114,26 @@ func parseTorrentFromPath(path string) (*os.File, error) {
 
 // Takes a file as argument and reads the torrent metadata from it.
 // Returns a Torrent struct with the metadata.
-func metaFromFile(f *os.File) (Torrent, error) {
+func metaFromFile(f *os.File) (*Torrent, error) {
 	if f == nil {
-		return Torrent{}, errors.New("file pointer is nil")
+		return nil, errors.New("file pointer is nil")
 	}
 
-	bt := bTorrent{}
+	bt := bcodeTorrent{}
 	if err := bencode.Unmarshal(f, &bt); err != nil {
-		return Torrent{}, errors.New("failed to parse torrent file: " + err.Error())
+		return nil, errors.New("failed to parse torrent file: " + err.Error())
 	}
 
 	// SHA1 hash of `info` dictionary
 	iHash := bt.Info.hash()
 
 	// Split the pieces into an array of  hashes
-	pHashes, err := splitPieceHashes(bt.Info)
+	pHashes, err := bt.Info.splitPieceHashes()
 	if err != nil {
-		return Torrent{}, err
+		return nil, err
 	}
 
-	t := Torrent{
+	t := &Torrent{
 		Announce:    bt.Announce,
 		InfoHash:    iHash,
 		PieceHashes: pHashes,
@@ -171,21 +146,30 @@ func metaFromFile(f *os.File) (Torrent, error) {
 	return t, nil
 }
 
-// Take the `info` key from meta and split the pieces into an array of hashes.
-// Returns an array of 20-byte hashes.
-func splitPieceHashes(i bInfo) ([][20]byte, error) {
-	hashLen := 20 // SHA1 is 20 bytes long
-
-	buf := make([]byte, len(i.Pieces))
-	if len(buf)%hashLen != 0 {
-		return nil, errors.New("malformed pieces: " + fmt.Sprint(len(buf)))
+// Calculate the SHA1 hash of the bencoded info dictionary.
+func (i bcodeInfo) hash() hash {
+	infoBytes := bytes.Buffer{}
+	if err := bencode.Marshal(&infoBytes, i); err != nil {
+		panic("failed to marshal info: " + err.Error())
 	}
 
-	numHashes := len(buf) / hashLen
-	hashes := make([][20]byte, numHashes)
+	return sha1.Sum(infoBytes.Bytes())
+}
 
-	for i := range numHashes {
-		copy(hashes[i][:], buf[i*hashLen:(i+1)*hashLen])
+// Take the `info` key from meta and split the pieces into an array of hashes.
+// Returns an array of 20-byte hashes.
+func (i bcodeInfo) splitPieceHashes() ([]hash, error) {
+	hashLen := 20 // SHA1 is 20 bytes long
+
+	if len(i.Pieces)%hashLen != 0 {
+		return nil, errors.New("malformed pieces: " + fmt.Sprint(len(i.Pieces)))
+	}
+
+	numHashes := len(i.Pieces) / hashLen
+	hashes := make([]hash, numHashes)
+
+	for idx := range numHashes {
+		copy(hashes[idx][:], i.Pieces[idx*hashLen:(idx+1)*hashLen])
 	}
 	return hashes, nil
 }
