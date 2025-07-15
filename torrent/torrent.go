@@ -70,16 +70,18 @@ func (t *Torrent) ViewTorrent() {
 		displaySize = fmt.Sprintf("%d KB", t.Length/1024)
 	}
 
-	fmt.Printf("\n\nAnnounce: %s\n", t.Announce)
+	line := strings.Repeat("#", 70)
+
+	fmt.Println()
+	fmt.Println(line)
+	fmt.Printf("\nAnnounce: %s\n", t.Announce)
 	fmt.Printf("File name: %s\n", t.Name)
 	fmt.Printf("File size: %s\n", displaySize)
 	fmt.Printf("Piece length: %d KB\n", t.PieceLength/1024)
 	fmt.Printf("Number of pieces: %d\n", len(t.PieceHashes))
 	fmt.Printf("Info Hash: %x\n\n", t.InfoHash)
-
-	fmt.Printf("\n\nPiece hashes 1: %x", t.PieceHashes[0])
-	fmt.Printf("\nPiece hashes 2: %x", t.PieceHashes[1])
-	fmt.Printf("\nPiece hashes 3: %x", t.PieceHashes[2])
+	fmt.Println(line)
+	fmt.Println()
 }
 
 func (t *Torrent) StartDownload() {
