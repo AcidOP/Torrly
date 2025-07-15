@@ -37,13 +37,13 @@ func NewHandshake(infoHash, peerId string) *Handshake {
 
 // Takes a Connection (to another peer) as an argument and sends our handshake.
 // Then waits for the peer to respond with its handshake and return it
-func (h Handshake) ExchangeHandshake(connPeer net.Conn) ([]byte, error) {
+func (own Handshake) ExchangeHandshake(connPeer net.Conn) ([]byte, error) {
 	hBuf := bytes.Buffer{}
-	hBuf.WriteByte(byte(h.pLength)) // pstrlen (1 byte)
-	hBuf.WriteString(h.pStr)        // pstr (19 bytes)
-	hBuf.Write([]byte(h.pReserved)) // reserved (8 bytes)
-	hBuf.Write([]byte(h.InfoHash))  // info_hash (20 bytes)
-	hBuf.Write([]byte(h.pId))       // peer_id (20 bytes)
+	hBuf.WriteByte(byte(own.pLength)) // pstrlen (1 byte)
+	hBuf.WriteString(own.pStr)        // pstr (19 bytes)
+	hBuf.Write([]byte(own.pReserved)) // reserved (8 bytes)
+	hBuf.Write([]byte(own.InfoHash))  // info_hash (20 bytes)
+	hBuf.Write([]byte(own.pId))       // peer_id (20 bytes)
 
 	hBytes := hBuf.Bytes() // 1 + 19 + 8 + 20 + 20 = 68 bytes
 
@@ -82,14 +82,14 @@ func DecodeHandshake(buf []byte) (*Handshake, error) {
 		pId:       string(buf[48:68]), // 20 bytes
 	}
 
-	if h.pLength != 19 || h.pStr != "BitTorrent protocol" {
+	if h.pLength != PROTOCOL_LENGTH || h.pStr != PROTOCOL_STRING {
 		return nil, errors.New("invalid handshake protocol string")
 	}
 
 	return &h, nil
 }
 
-func (h *Handshake) VerifyHandshake(raw []byte) bool {
+func (own *Handshake) VerifyHandshake(raw []byte) bool {
 	h2, err := DecodeHandshake(raw)
 	if err != nil {
 		return false
@@ -98,7 +98,7 @@ func (h *Handshake) VerifyHandshake(raw []byte) bool {
 	if h2.pLength != PROTOCOL_LENGTH ||
 		h2.pStr != PROTOCOL_STRING ||
 		len(h2.pReserved) != 8 ||
-		h.InfoHash != h2.InfoHash {
+		own.InfoHash != h2.InfoHash {
 		return false
 	}
 	return true
