@@ -54,3 +54,5 @@ func ReceivePeerMessage(r io.Reader) (*Message, error) {
 		Payload: payload,
 	}, nil
 }
+
+//pushable
