@@ -56,7 +56,7 @@ func (t *Torrent) getTrackerResponse() ([]byte, error) {
 
 	resp, err := http.Get(trackerURL)
 	if err != nil || resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to connect to tracker")
+		return nil, err
 	}
 	defer resp.Body.Close()
 

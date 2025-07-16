@@ -87,10 +87,11 @@ func (t *Torrent) ViewTorrent() {
 func (t *Torrent) StartDownload() {
 	pArr, err := t.GetAvailablePeers()
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 
-	pm := peers.NewPeerManager(pArr, string(t.InfoHash[:]), t.PeerId)
+	pm := peers.NewPeerManager(pArr, t.InfoHash[:], []byte(t.PeerId))
 	pm.HandlePeers()
 }
 
@@ -135,6 +136,13 @@ func metaFromFile(f *os.File) (*Torrent, error) {
 		return nil, err
 	}
 
+	peerID := []byte(PeerID)
+	if len(peerID) < 20 {
+		// Pad with extra characters or random bytes
+		padding := make([]byte, 20-len(peerID))
+		peerID = append(peerID, padding...)
+	}
+
 	t := &Torrent{
 		Announce:    bt.Announce,
 		InfoHash:    iHash,
@@ -142,7 +150,7 @@ func metaFromFile(f *os.File) (*Torrent, error) {
 		PieceLength: bt.Info.PieceLength,
 		Length:      bt.Info.Length,
 		Name:        bt.Info.Name,
-		PeerId:      PeerID,
+		PeerId:      string(peerID),
 		Port:        Port,
 	}
 	return t, nil

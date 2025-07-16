@@ -20,17 +20,20 @@ type Peer struct {
 
 type PeerManager struct {
 	peers          []Peer
-	infoHash       string
-	peerId         string
+	infoHash       []byte
+	peerId         []byte
 	connectedPeers []*Peer
 }
 
-func NewPeerManager(peers []Peer, infoHash, peerId string) *PeerManager {
+func NewPeerManager(peers []Peer, infoHash, peerId []byte) *PeerManager {
 	return &PeerManager{peers: peers, infoHash: infoHash, peerId: peerId}
 }
 
 func (pm *PeerManager) HandlePeers() {
-	hs := handshake.NewHandshake(pm.infoHash, pm.peerId)
+	hs, err := handshake.NewHandshake(pm.infoHash, pm.peerId)
+	if err != nil {
+		panic(err)
+	}
 
 	for i := range pm.peers {
 		p := &pm.peers[i]
@@ -47,13 +50,14 @@ func (pm *PeerManager) HandlePeers() {
 			continue
 		}
 
-		matched := hs.VerifyHandshake(pHandshake)
-
-		if matched {
-			pm.connectedPeers = append(pm.connectedPeers, p)
-			p.conn = conn
-			p.exchangeMessages()
+		if err := hs.VerifyHandshake(pHandshake); err != nil {
+			continue
 		}
+
+		pm.connectedPeers = append(pm.connectedPeers, p)
+		p.conn = conn
+		p.exchangeMessages()
+		break
 	}
 }
 
