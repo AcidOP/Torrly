@@ -42,15 +42,21 @@ func ReceivePeerMessage(r io.Reader) (*Message, error) {
 		return nil, err
 	}
 
-	fmt.Println("Received message ID:", messageBuf[0])
 	if len(messageBuf) < 1 {
-		return nil, fmt.Errorf("invalid message format")
+		return nil, fmt.Errorf("invalid message format: message too short")
 	}
 
+	msgID := int(messageBuf[0])
 	payload := messageBuf[1:]
 
+	fmt.Printf("Received message ID: %d\n", msgID)
+	if msgID == MsgBitfield {
+		fmt.Printf("Bitfield payload length: %d\n", len(payload))
+		fmt.Printf("Bitfield payload (hex): %x\n", payload)
+	}
+
 	return &Message{
-		ID:      int(messageBuf[0]),
+		ID:      msgID,
 		Payload: payload,
 	}, nil
 }
