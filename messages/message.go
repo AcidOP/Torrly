@@ -21,12 +21,8 @@ const (
 )
 
 type Message struct {
-	ID      byte
+	ID      int
 	Payload []byte
-}
-
-func (m Message) String() string {
-	return string(m.ID) + string(m.Payload[:])
 }
 
 func MessageIDToString(id int) string {
@@ -77,29 +73,24 @@ func ReceivePeerMessage(conn net.Conn) (*Message, error) {
 		return nil, nil
 	}
 
-	// idBuffer := make([]byte, 1)
-	// if _, err := io.ReadFull(conn, idBuffer); err != nil {
-	// 	return nil, err
-	// }
-	// messageID := idBuffer[0]
-
-	// payload := make([]byte, length-1)
-	// if _, err := io.ReadFull(conn, payload); err != nil {
-	// 	return nil, err
-	// }
-
 	msgBuf := make([]byte, length-1)
 	if _, err := io.ReadFull(conn, msgBuf); err != nil {
 		return nil, err
 	}
 
-	// Step 3: Extract message ID and payload
-	msgID := msgBuf[0]
+	msgID := int(msgBuf[0])
 	payload := msgBuf[1:]
+
+	if msgID == IDBitfield {
+		expectedLength := (2680 + 7) / 8
+		if len(payload) > expectedLength {
+			fmt.Println("Bitfield too long! Possible error.")
+		}
+	}
 
 	fmt.Println("Raw MessageID: ", msgID)
 
-	fmt.Printf("Received message ID: %s, Length: %d\n", MessageIDToString(int(msgID)), length)
+	fmt.Printf("Received message ID: %s, Length: %d\n", MessageIDToString(msgID), length)
 	fmt.Printf("Payload: %x\n", payload)
 
 	return &Message{ID: msgID, Payload: payload}, nil
