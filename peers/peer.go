@@ -56,12 +56,11 @@ func (pm *PeerManager) HandlePeers() {
 		}
 
 		bf, err := messages.ReceiveBitField(conn)
-		if err != nil {
-			continue // BitField is optional
+		if err == nil {
+			p.Bitfield = bf
 		}
 
 		p.conn = conn
-		p.Bitfield = bf
 
 		pm.connectedPeers = append(pm.connectedPeers, p)
 		p.exchangeMessages()
