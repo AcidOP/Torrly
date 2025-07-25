@@ -38,7 +38,7 @@ type bcodeTorrent struct {
 }
 
 const (
-	PeerID = "-TRLY01-9a8b7c6d5e4f"
+	PeerID = "-TRLY01-123456789012"
 	Port   = 6881
 )
 
@@ -136,13 +136,6 @@ func metaFromFile(f *os.File) (*Torrent, error) {
 		return nil, err
 	}
 
-	peerID := []byte(PeerID)
-	if len(peerID) < 20 {
-		// Pad with extra characters or random bytes
-		padding := make([]byte, 20-len(peerID))
-		peerID = append(peerID, padding...)
-	}
-
 	t := &Torrent{
 		Announce:    bt.Announce,
 		InfoHash:    iHash,
@@ -150,7 +143,7 @@ func metaFromFile(f *os.File) (*Torrent, error) {
 		PieceLength: bt.Info.PieceLength,
 		Length:      bt.Info.Length,
 		Name:        bt.Info.Name,
-		PeerId:      string(peerID),
+		PeerId:      PeerID,
 		Port:        Port,
 	}
 	return t, nil

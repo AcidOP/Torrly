@@ -11,11 +11,12 @@ import (
 )
 
 type Peer struct {
-	IP     net.IP
-	Port   int
-	Choked bool
-	PeerId string // (Optional)
-	conn   net.Conn
+	IP       net.IP
+	Port     int
+	Choked   bool
+	PeerId   string // (Optional)
+	conn     net.Conn
+	Bitfield []byte
 }
 
 type PeerManager struct {
@@ -45,25 +46,32 @@ func (pm *PeerManager) HandlePeers() {
 
 		pHandshake, err := hs.ExchangeHandshake(conn)
 		if err != nil || pHandshake == nil {
-			fmt.Printf("\nFailed to exchange handshake with peer: %s", p.IP.String())
+			fmt.Printf("\nFailed to exchange handshake with peer: %s\n", p.IP.String())
 			conn.Close()
 			continue
 		}
 
 		if err := hs.VerifyHandshake(pHandshake); err != nil {
-			continue
+			continue // Ignore peers that do not match the handshake
 		}
 
-		pm.connectedPeers = append(pm.connectedPeers, p)
+		bf, err := messages.ReceiveBitField(conn)
+		if err != nil {
+			continue // BitField is optional
+		}
+
 		p.conn = conn
+		p.Bitfield = bf
+
+		pm.connectedPeers = append(pm.connectedPeers, p)
 		p.exchangeMessages()
-		break
 	}
 }
 
-func (p Peer) exchangeMessages() {
+func (p *Peer) exchangeMessages() {
 	fmt.Println("\n\nStarting communication with peer: ", p.IP.String())
 
+	messages.ReceivePeerMessage(p.conn)
 	messages.ReceivePeerMessage(p.conn)
 	p.conn.Close()
 }
@@ -71,7 +79,8 @@ func (p Peer) exchangeMessages() {
 // COnnect to the associated peer using its IP and Port.
 // Returns a net.Conn if successful, or an error if it fails.
 // Returned `net.Conn` MUST be closed later by the caller.
-func (p Peer) ConnectToPeer() (net.Conn, error) {
+func (p *Peer) ConnectToPeer() (net.Conn, error) {
 	addr := net.JoinHostPort(p.IP.String(), strconv.Itoa(p.Port))
-	return net.DialTimeout("tcp", addr, 5*time.Second)
+	timeout := time.Second * 5
+	return net.DialTimeout("tcp", addr, timeout)
 }

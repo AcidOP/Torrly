@@ -6,8 +6,10 @@ import (
 	"io"
 )
 
+type MsgID = uint8
+
 const (
-	MsgChoke = iota
+	MsgChoke MsgID = iota
 	MsgUnchoke
 	MsgInterested
 	MsgNotInterested
@@ -19,8 +21,23 @@ const (
 )
 
 type Message struct {
-	ID      int
+	ID      MsgID
 	Payload []byte
+}
+
+func ReceiveBitField(r io.Reader) ([]byte, error) {
+	msg, err := ReceivePeerMessage(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if msg.ID != MsgBitfield {
+		return nil, fmt.Errorf("expected bitfield but got ID %d", msg.ID)
+	}
+
+	// fmt.Printf("\nReceived Bitfield: %b\n\n", msg.Payload)
+
+	return msg.Payload, nil
 }
 
 func ReceivePeerMessage(r io.Reader) (*Message, error) {
@@ -46,14 +63,10 @@ func ReceivePeerMessage(r io.Reader) (*Message, error) {
 		return nil, fmt.Errorf("invalid message format: message too short")
 	}
 
-	msgID := int(messageBuf[0])
+	msgID := MsgID(messageBuf[0])
 	payload := messageBuf[1:]
 
 	fmt.Printf("Received message ID: %d\n", msgID)
-	if msgID == MsgBitfield {
-		fmt.Printf("Bitfield payload length: %d\n", len(payload))
-		fmt.Printf("Bitfield payload (hex): %x\n", payload)
-	}
 
 	return &Message{
 		ID:      msgID,

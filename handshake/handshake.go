@@ -19,11 +19,11 @@ const (
 
 // https://wiki.theory.org/BitTorrentSpecification#Handshake
 type Handshake struct {
-	InfoHash  []byte
-	PeerID    []byte
 	pLength   int
 	pStr      string
 	pReserved []byte
+	InfoHash  []byte
+	PeerID    []byte
 }
 
 func NewHandshake(infoHash, peerID []byte) (*Handshake, error) {
@@ -34,69 +34,15 @@ func NewHandshake(infoHash, peerID []byte) (*Handshake, error) {
 	return &Handshake{
 		pLength:   PROTOCOL_LENGTH,
 		pStr:      PROTOCOL_STRING,
-		pReserved: make([]byte, RESERVED_LENGTH), // All zeros
+		pReserved: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		InfoHash:  infoHash,
 		PeerID:    peerID,
 	}, nil
 }
 
-func (h *Handshake) ExchangeHandshake(connPeer net.Conn) ([]byte, error) {
-	hBuf := bytes.Buffer{}
-
-	// Build handshake: pstrlen + pstr + reserved + info_hash + peer_id
-	hBuf.WriteByte(byte(h.pLength)) // pstrlen (1 byte)
-	hBuf.WriteString(h.pStr)        // pstr (19 bytes)
-	hBuf.Write(h.pReserved)         // reserved (8 bytes) - should be all zeros
-	hBuf.Write(h.InfoHash)          // info_hash (20 bytes)
-	hBuf.Write(h.PeerID)            // peer_id (20 bytes)
-
-	hBytes := hBuf.Bytes()
-
-	if len(hBytes) != HANDSHAKE_LENGTH {
-		return nil, fmt.Errorf("handshake byte length expected %d bytes, got: %d",
-			HANDSHAKE_LENGTH, len(hBytes))
-	}
-
-	// Proper debugging output
-	fmt.Printf("\n\n=== OUTGOING HANDSHAKE ===\n")
-	fmt.Printf("Total length: %d bytes\n", len(hBytes))
-	fmt.Printf("Protocol length: %d\n", hBytes[0])
-	fmt.Printf("Protocol string: %q\n", string(hBytes[1:20]))
-	fmt.Printf("Reserved field: %x (should be all zeros)\n", hBytes[20:28])
-	fmt.Printf("Info hash: %x\n", hBytes[28:48])
-	fmt.Printf("Peer ID: %q\n", string(hBytes[48:68]))
-	fmt.Printf("Full handshake: %s\n", hBytes)
-	fmt.Printf("========================\n")
-
-	if _, err := connPeer.Write(hBytes); err != nil {
-		return nil, fmt.Errorf("failed to send handshake: %v", err)
-	}
-
-	// Set read timeout
-	connPeer.SetReadDeadline(time.Now().Add(time.Second * 10))
-
-	received := make([]byte, HANDSHAKE_LENGTH)
-	if _, err := io.ReadFull(connPeer, received); err != nil {
-		return nil, fmt.Errorf("failed to read handshake response: %v", err)
-	}
-
-	// Proper debugging for received handshake
-	fmt.Printf("\n\n=== INCOMING HANDSHAKE ===\n")
-	fmt.Printf("Total length: %d bytes\n", len(received))
-	fmt.Printf("Protocol length: %d\n", received[0])
-	fmt.Printf("Protocol string: %q\n", string(received[1:20]))
-	fmt.Printf("Reserved field: %x\n", received[20:28])
-	fmt.Printf("Info hash: %x\n", received[28:48])
-	fmt.Printf("Peer ID: %q\n", string(received[48:68]))
-	fmt.Printf("Full handshake: %s\n", received)
-	fmt.Printf("========================\n")
-
-	return received, nil
-}
-
 // Takes a Connection (to another peer) as an argument and sends our handshake.
 // Then waits for the peer to respond with its handshake and return it
-func (h *Handshake) ExchangeHandshakeOld(connPeer net.Conn) ([]byte, error) {
+func (h *Handshake) ExchangeHandshake(connPeer net.Conn) ([]byte, error) {
 	hBuf := bytes.Buffer{}
 
 	// Build handshake: pstrlen + pstr + reserved + info_hash + peer_id
@@ -113,21 +59,21 @@ func (h *Handshake) ExchangeHandshakeOld(connPeer net.Conn) ([]byte, error) {
 			HANDSHAKE_LENGTH, len(hBytes))
 	}
 
-	fmt.Printf("Sending Handshake (%d bytes): %s\n", len(hBytes), hBytes)
+	fmt.Printf("Sending Handshake (%d bytes):  %x\n", len(hBytes), hBytes)
 
 	if _, err := connPeer.Write(hBytes); err != nil {
 		return nil, fmt.Errorf("failed to send handshake: %v", err)
 	}
 
 	// Set read timeout
-	connPeer.SetReadDeadline(time.Now().Add(time.Second * 10))
+	connPeer.SetReadDeadline(time.Now().Add(time.Second * 5))
 
 	received := make([]byte, HANDSHAKE_LENGTH)
 	if _, err := io.ReadFull(connPeer, received); err != nil {
 		return nil, fmt.Errorf("failed to read handshake response: %v", err)
 	}
 
-	fmt.Printf("Received Handshake (%d bytes): %s\n", len(received), received)
+	fmt.Printf("Received Handshake (%d bytes): %x\n", len(received), received)
 
 	return received, nil
 }
