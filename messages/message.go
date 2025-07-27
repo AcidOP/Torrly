@@ -25,25 +25,52 @@ type Message struct {
 	Payload []byte
 }
 
-func ReceiveBitField(r io.Reader) ([]byte, error) {
-	msg, err := ReceivePeerMessage(r)
-	if err != nil {
-		return nil, err
-	}
+// Serialize converts the `Message` into a byte slice for peer communication.
+// Syntax: <length prefix><message ID><payload>.
+// https://wiki.theory.org/BitTorrentSpecification#Messages
+func (msg *Message) Serialize() []byte {
+	length := len(msg.Payload) + 1 // +1 for the message ID
+	buf := make([]byte, 4+length)
 
-	if msg.ID != MsgBitfield {
-		return nil, fmt.Errorf("expected bitfield but got ID %d", msg.ID)
-	}
+	binary.BigEndian.PutUint32(buf[0:4], uint32(length))
 
-	// fmt.Printf("\nReceived Bitfield: %b\n\n", msg.Payload)
+	buf[4] = msg.ID
 
-	return msg.Payload, nil
+	copy(buf[5:], msg.Payload)
+	return buf
 }
 
-func ReceivePeerMessage(r io.Reader) (*Message, error) {
+func (msg *Message) String() string {
+	switch msg.ID {
+	case MsgChoke:
+		return "Choke"
+	case MsgUnchoke:
+		return "Unchoke"
+	case MsgInterested:
+		return "Interested"
+	case MsgNotInterested:
+		return "Not Interested"
+	case MsgHave:
+		return "Have"
+	case MsgBitfield:
+		return "Bitfield"
+	case MsgRequest:
+		return "Request"
+	case MsgPiece:
+		return "Piece"
+	case MsgCancel:
+		return "Cancel"
+	default:
+		return fmt.Sprintf("Unknown Message ID: %d", msg.ID)
+	}
+}
+
+// Receive function reads data from a stream and returns a `Message`.
+// It expects the first 4 bytes to be the length of the message,
+// followed by the message ID and payload.
+func Receive(r io.Reader) (*Message, error) {
 	lengthBuf := make([]byte, 4)
-	_, err := io.ReadFull(r, lengthBuf)
-	if err != nil {
+	if _, err := io.ReadFull(r, lengthBuf); err != nil {
 		return nil, err
 	}
 	length := binary.BigEndian.Uint32(lengthBuf)
@@ -53,23 +80,16 @@ func ReceivePeerMessage(r io.Reader) (*Message, error) {
 		return nil, nil
 	}
 
-	messageBuf := make([]byte, length)
-	_, err = io.ReadFull(r, messageBuf)
-	if err != nil {
+	buf := make([]byte, length)
+	if _, err := io.ReadFull(r, buf); err != nil {
 		return nil, err
 	}
 
-	if len(messageBuf) < 1 {
-		return nil, fmt.Errorf("invalid message format: message too short")
+	msg := &Message{
+		ID:      MsgID(buf[0]),
+		Payload: buf[1:],
 	}
 
-	msgID := MsgID(messageBuf[0])
-	payload := messageBuf[1:]
-
-	fmt.Printf("Received message ID: %d\n", msgID)
-
-	return &Message{
-		ID:      msgID,
-		Payload: payload,
-	}, nil
+	fmt.Printf("Received message ID: %s\n", msg.String())
+	return msg, nil
 }
