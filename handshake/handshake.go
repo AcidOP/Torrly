@@ -58,8 +58,7 @@ func (h *Handshake) Serialize() []byte {
 }
 
 func (h *Handshake) String() string {
-	hs := string(h.Serialize())
-	return hs
+	return string(h.Serialize())
 }
 
 // Takes a Connection (to another peer) as an argument and sends our handshake.
