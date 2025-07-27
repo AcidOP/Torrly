@@ -6,3 +6,5 @@
 
 # Any torrent files for testing
 *.torrent
+
+.idea
