@@ -20,10 +20,10 @@ type Peer struct {
 }
 
 type PeerManager struct {
-	peers          []Peer
-	infoHash       []byte
-	peerId         []byte
-	connectedPeers []*Peer
+	peers    []Peer
+	infoHash []byte
+	peerId   []byte
+	// connectedPeers []*Peer
 }
 
 func NewPeerManager(peers []Peer, infoHash, peerId []byte) *PeerManager {
@@ -46,7 +46,7 @@ func (pm *PeerManager) HandlePeers() {
 		}
 
 		pHandshake, err := hs.ExchangeHandshake(conn)
-		if err != nil || pHandshake == nil {
+		if err != nil || len(pHandshake.String()) == 0 {
 			fmt.Printf("\nFailed to exchange handshake with peer: %s\n", p.IP.String())
 			conn.Close()
 			continue
@@ -70,6 +70,11 @@ func (pm *PeerManager) HandlePeers() {
 		p.sendInterested()
 		p.exchangeMessages()
 	}
+}
+
+func (p *Peer) Read() (*messages.Message, error) {
+	msg, err := messages.Receive(p.conn)
+	return msg, err
 }
 
 func (p *Peer) receiveBitField() ([]byte, error) {
@@ -111,7 +116,6 @@ func (p *Peer) exchangeMessages() {
 	fmt.Println("\n\nStarting communication with peer: ", p.IP.String())
 
 	for {
-		// messages.Send(p.conn)
 		msg, err := messages.Receive(p.conn)
 		if err != nil {
 			fmt.Println("Error receiving message from peer:", err)
