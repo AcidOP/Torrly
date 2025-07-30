@@ -91,7 +91,14 @@ func (t *Torrent) StartDownload() {
 		return
 	}
 
-	pm := peers.NewPeerManager(pArr, t.InfoHash[:], []byte(t.PeerId))
+	pm := peers.NewPeerManager(
+		pArr,
+		t.InfoHash[:],
+		[]byte(t.PeerId),
+		t.PieceHashes,
+		t.PieceLength,
+		t.Length,
+	)
 	pm.HandlePeers()
 }
 
