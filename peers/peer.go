@@ -1,7 +1,6 @@
 package peers
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 	"strconv"
@@ -17,7 +16,6 @@ type Peer struct {
 	IP       net.IP
 	Port     int
 	Choked   bool
-	PeerId   string // (Optional)
 	conn     net.Conn
 	Bitfield []byte
 }
@@ -92,48 +90,6 @@ func (p *Peer) Read() (*messages.Message, error) {
 	return msg, err
 }
 
-func (p *Peer) receiveBitField() ([]byte, error) {
-	msg, err := messages.Receive(p.conn)
-	if err != nil {
-		return nil, err
-	}
-
-	if msg.ID != messages.MsgBitfield {
-		return nil, fmt.Errorf("expected bitfield message (ID 5), but got ID %d", msg.ID)
-	}
-
-	if len(msg.Payload) == 0 {
-		return nil, fmt.Errorf("received empty bitfield payload from peer %s", p.IP.String())
-	}
-
-	// fmt.Printf("\nReceived Bitfield: %x\n\n", msg.Payload)
-
-	return msg.Payload, nil
-}
-
-func (p *Peer) sendInterested() error {
-	msg := messages.Message{ID: messages.MsgInterested}
-	_, err := p.conn.Write(msg.Serialize())
-
-	fmt.Println("Sent `ineterested` message to peer:", p.IP.String())
-	return err
-}
-
-func (p *Peer) sendRequest(index, length, begin int) {
-	msg := messages.Message{
-		ID:      messages.MsgRequest,
-		Payload: make([]byte, 12),
-	}
-	binary.BigEndian.PutUint32(msg.Payload[0:4], uint32(index))
-	binary.BigEndian.PutUint32(msg.Payload[4:8], uint32(begin))
-	binary.BigEndian.PutUint32(msg.Payload[8:12], uint32(length))
-
-	_, err := p.conn.Write(msg.Serialize())
-	if err != nil {
-		fmt.Println("Error writing request:", err)
-	}
-}
-
 func (p *Peer) startDownloader(pieces []hash, pieceLength int) {
 	fmt.Println("\n\nRequesting pieces from: ", p.IP.String())
 
@@ -158,7 +114,7 @@ func (p *Peer) startDownloader(pieces []hash, pieceLength int) {
 
 		fmt.Printf("Requesting piece %d from peer %s\n", i, p.IP.String())
 
-		blockSize := 16384 // 16 KB
+		blockSize := 16 * 1024 // 16 KB
 		for begin := 0; begin < pieceLength; begin += blockSize {
 			length := blockSize
 			if begin+length > pieceLength {

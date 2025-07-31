@@ -84,7 +84,6 @@ func (t Torrent) GetAvailablePeers() ([]peers.Peer, error) {
 		pArr = append(pArr, peers.Peer{
 			IP:     net.ParseIP(p.IP),
 			Port:   p.Port,
-			PeerId: p.PeerId,
 			Choked: true,
 		})
 	}
