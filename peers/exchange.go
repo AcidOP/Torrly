@@ -7,14 +7,15 @@ import (
 	"github.com/AcidOP/torrly/messages"
 )
 
-func (p *Peer) receiveBitField() ([]byte, error) {
+func (p *Peer) receiveBitField() (*messages.Message, error) {
 	msg, err := messages.Receive(p.conn)
 	if err != nil {
 		return nil, err
 	}
 
 	if msg.ID != messages.MsgBitfield {
-		return nil, fmt.Errorf("expected bitfield message (ID 5), but got ID %d", msg.ID)
+		fmt.Printf("\n\n[%s] Peer did not send a bitfield message\n\n", p.IP.String())
+		return nil, nil
 	}
 
 	if len(msg.Payload) == 0 {
@@ -23,8 +24,12 @@ func (p *Peer) receiveBitField() ([]byte, error) {
 
 	// fmt.Printf("\nReceived Bitfield: %x\n\n", msg.Payload)
 
-	return msg.Payload, nil
+	return msg, nil
 }
+
+// func (p *Peer) receivePiece() ([]byte, error) {
+
+// }
 
 func (p *Peer) sendInterested() error {
 	msg := messages.Message{ID: messages.MsgInterested}

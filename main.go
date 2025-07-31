@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	t1, err := torrent.NewTorrentFromFile("./debian.torrent")
+	t1, err := torrent.NewTorrentFromFile("./test.torrent")
 	if err != nil {
 		panic(err)
 	}

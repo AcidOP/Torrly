@@ -65,18 +65,27 @@ func (pm *PeerManager) HandlePeers() {
 			continue
 		}
 
+		// If the handshake is invalid, we ignore this peer.
 		if err := hs.VerifyHandshake(pHandshake); err != nil {
-			continue // Ignore peers that do not match the handshake
+			continue
 		}
 
-		p.conn = conn   // Reuse the connection for further communication
-		p.Choked = true // Initially choked
+		p.conn = conn // Reuse the connection for further communication
 
-		bf, err := p.receiveBitField()
+		msg, err := p.receiveBitField()
 		if err != nil {
 			fmt.Println(err)
+		}
+
+		if msg.ID == messages.MsgBitfield {
+			p.Bitfield = msg.Payload
+		}
+
+		// First message might not be Bitfield, so we check if it is Unchoke
+		if msg.ID == messages.MsgUnchoke {
+			p.Choked = false
 		} else {
-			p.Bitfield = bf
+			p.Choked = true
 		}
 
 		// pm.connectedPeers = append(pm.connectedPeers, p)
@@ -138,11 +147,11 @@ func (p *Peer) startDownloader(pieces []hash, pieceLength int) {
 			}
 
 			if msg.ID != messages.MsgPiece {
-				fmt.Printf("Expected piece message, but got ID %d from peer %s\n", msg.ID, p.IP.String())
+				fmt.Printf("\n[%s] Expected piece message, but got ID %d\n", p.IP.String(), msg.ID)
 				continue
 			}
 
-			fmt.Printf("Received %d bytes for piece %d from peer %s\n", len(msg.Payload), i, p.IP.String())
+			fmt.Printf("\n[%s] Received %d bytes for piece %d\n", p.IP.String(), len(msg.Payload), i)
 		}
 	}
 }
