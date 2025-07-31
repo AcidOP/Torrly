@@ -3,6 +3,7 @@ package torrent
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -20,8 +21,28 @@ type peer struct {
 }
 
 type TrackerResponse struct {
-	Interval int    `bencode:"interval"`
-	Peers    []peer `bencode:"peers"`
+	Interval   int    `bencode:"interval"`
+	Peers      []peer `bencode:"peers"`
+	Completed  int    `bencode:"complete"`
+	Incomplete int    `bencode:"incomplete"`
+}
+
+func (tr TrackerResponse) Show() {
+	fmt.Println("📡 Tracker Response:")
+	fmt.Println()
+	fmt.Println("  ⏱ Interval:", tr.Interval)
+	fmt.Println("  👥 Peers: ", len(tr.Peers))
+
+	if tr.Completed > 0 || tr.Incomplete > 0 {
+		fmt.Println("  📊 Swarm Stats:")
+		if tr.Completed > 0 {
+			fmt.Println("    ✅ Seeders (complete):", tr.Completed)
+		}
+		if tr.Incomplete > 0 {
+			fmt.Println("    🔄 Leechers (incomplete):", tr.Incomplete)
+		}
+	}
+	fmt.Println()
 }
 
 // Create a URL to request to the tracker for peer information
@@ -78,6 +99,8 @@ func (t Torrent) GetAvailablePeers() ([]peers.Peer, error) {
 	if err = bencode.Unmarshal(bytes.NewReader(res), &tr); err != nil {
 		return nil, err
 	}
+
+	tr.Show()
 
 	pArr := []peers.Peer{}
 	for _, p := range tr.Peers {
