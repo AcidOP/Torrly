@@ -84,8 +84,16 @@ func (pm *PeerManager) HandlePeers() {
 	}
 }
 
-func (p *Peer) Read() (*messages.Message, error) {
-	p.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+// Read function reads a `messages.Message` from the peer's connection.
+// (Optionally) accepts a timeout duration to set a read deadline.
+// If no timeout is provided, it defaults to 5 seconds.
+func (p *Peer) Read(timeout ...time.Duration) (*messages.Message, error) {
+	duration := 5 * time.Second // Default timeout
+	if len(timeout) > 0 {
+		duration = timeout[0]
+	}
+
+	p.conn.SetReadDeadline(time.Now().Add(duration))
 	msg, err := messages.Receive(p.conn)
 	return msg, err
 }
