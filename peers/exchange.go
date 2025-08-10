@@ -27,9 +27,12 @@ func (p *Peer) receiveBitField() (*messages.Message, error) {
 	return msg, nil
 }
 
-// func (p *Peer) receivePiece() ([]byte, error) {
+func (p *Peer) Send(msg *messages.Message) error {
+	_, err := p.conn.Write(msg.Serialize())
 
-// }
+	fmt.Printf("\nSent message (%s) to peer: %s\n", msg.String(), p.IP.String())
+	return err
+}
 
 func (p *Peer) sendInterested() error {
 	msg := messages.Message{ID: messages.MsgInterested}

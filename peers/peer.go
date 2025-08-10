@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/AcidOP/torrly/handshake"
 	"github.com/AcidOP/torrly/messages"
 )
 
@@ -18,79 +17,6 @@ type Peer struct {
 	Choked   bool
 	conn     net.Conn
 	Bitfield []byte
-}
-
-type PeerManager struct {
-	peers       []Peer
-	infoHash    []byte
-	peerId      []byte
-	pieceHashes []hash
-	pieceLength int
-	totalLength int
-	// connectedPeers []*Peer
-}
-
-func NewPeerManager(
-	peers []Peer, infoHash, peerId []byte, pieces []hash, pieceLength, totalLength int,
-) *PeerManager {
-	return &PeerManager{
-		peers:       peers,
-		infoHash:    infoHash,
-		peerId:      peerId,
-		pieceHashes: pieces,
-		pieceLength: pieceLength,
-		totalLength: totalLength,
-	}
-}
-
-func (pm *PeerManager) HandlePeers() {
-	hs, err := handshake.NewHandshake(pm.infoHash, pm.peerId)
-	if err != nil {
-		fmt.Println("Error creating handshake:", err)
-		return
-	}
-
-	for i := range pm.peers {
-		p := &pm.peers[i]
-
-		conn, err := p.connect()
-		if err != nil || conn == nil {
-			continue
-		}
-
-		pHandshake, err := hs.ExchangeHandshake(conn)
-		if err != nil || len(pHandshake.String()) == 0 {
-			fmt.Printf("\nFailed to exchange handshake with peer: %s\n", p.IP.String())
-			conn.Close()
-			continue
-		}
-
-		// If the handshake is invalid, we ignore this peer.
-		if err := hs.VerifyHandshake(pHandshake); err != nil {
-			continue
-		}
-
-		p.conn = conn // Reuse the connection for further communication
-
-		msg, err := p.receiveBitField()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		if msg.ID == messages.MsgBitfield {
-			p.Bitfield = msg.Payload
-		}
-
-		// First message might not be Bitfield, so we check if it is Unchoke
-		if msg.ID == messages.MsgUnchoke {
-			p.Choked = false
-		} else {
-			p.Choked = true
-		}
-
-		// pm.connectedPeers = append(pm.connectedPeers, p)
-		p.startDownloader(pm.pieceHashes, pm.pieceLength)
-	}
 }
 
 // Read function reads a `messages.Message` from the peer's connection.
@@ -163,4 +89,14 @@ func (p *Peer) connect() (net.Conn, error) {
 	addr := net.JoinHostPort(p.IP.String(), strconv.Itoa(p.Port))
 	timeout := time.Second * 5
 	return net.DialTimeout("tcp", addr, timeout)
+}
+
+func (p *Peer) hasBitfield(index int) bool {
+	if index < 0 || index >= len(p.Bitfield)*8 {
+		return false
+	}
+
+	byteIndex := index / 8
+	bitIndex := index % 8
+	return (p.Bitfield[byteIndex] & (1 << (7 - bitIndex))) != 0
 }
