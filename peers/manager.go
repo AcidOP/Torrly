@@ -45,15 +45,8 @@ func (pm *PeerManager) HandlePeers() {
 			continue
 		}
 
-		pHandshake, err := hs.ExchangeHandshake(conn)
-		if err != nil || len(pHandshake.String()) == 0 {
-			fmt.Printf("\nFailed to exchange handshake with peer: %s\n", p.IP.String())
+		if err = hs.ExchangeHandshake(conn); err != nil {
 			conn.Close()
-			continue
-		}
-
-		// If the handshake is invalid, we ignore this peer.
-		if err := hs.VerifyHandshake(pHandshake); err != nil {
 			continue
 		}
 
@@ -64,15 +57,16 @@ func (pm *PeerManager) HandlePeers() {
 			fmt.Println(err)
 		}
 
-		if msg.ID == messages.MsgBitfield {
+		switch msg.ID {
+		case messages.MsgBitfield:
 			p.Bitfield = msg.Payload
-		}
-
-		// First message might not be Bitfield, so we check if it is Unchoke
-		if msg.ID == messages.MsgUnchoke {
-			p.Choked = false
-		} else {
-			p.Choked = true
+		case messages.MsgUnchoke:
+			p.unchoke()
+		case messages.MsgChoke:
+			p.choke()
+		default:
+			fmt.Printf("Received unexpected message ID %d from peer %s\n", msg.ID, p.IP.String())
+			continue
 		}
 
 		// pm.connectedPeers = append(pm.connectedPeers, p)
@@ -108,11 +102,7 @@ func (pm *PeerManager) RemovePeer(p Peer) error {
 
 func (pm *PeerManager) BroadcastMessage(msg *messages.Message) {
 	for _, peer := range pm.connectedPeers {
-		if peer.Choked {
-			continue
-		}
-
-		if err := peer.Send(msg); err != nil {
+		if err := peer.send(msg); err != nil {
 			fmt.Printf("Error sending message to peer %s: %v\n", peer.IP.String(), err)
 			continue
 		}

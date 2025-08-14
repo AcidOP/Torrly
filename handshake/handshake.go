@@ -63,19 +63,28 @@ func (h *Handshake) String() string {
 
 // Takes a Connection (to another peer) as an argument and sends our handshake.
 // Then waits for the peer to respond with its handshake and return it
-func (h *Handshake) ExchangeHandshake(conn net.Conn) (Handshake, error) {
+func (h *Handshake) ExchangeHandshake(conn net.Conn) error {
 	if _, err := conn.Write(h.Serialize()); err != nil {
-		return Handshake{}, fmt.Errorf("failed to send handshake: %v", err)
+		return fmt.Errorf("failed to send handshake: %v", err)
 	}
 
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 
 	received := make([]byte, HANDSHAKE_LENGTH)
 	if _, err := io.ReadFull(conn, received); err != nil {
-		return Handshake{}, fmt.Errorf("failed to read handshake response: %v", err)
+		return fmt.Errorf("failed to read handshake response: %v", err)
 	}
 
-	return DecodeHandshake(received)
+	hs, err := DecodeHandshake(received)
+	if err != nil {
+		return fmt.Errorf("failed to decode handshake: %v", err)
+	}
+
+	if err := h.VerifyHandshake(hs); err != nil {
+		return fmt.Errorf("handshake verification failed: %v", err)
+	}
+
+	return nil
 }
 
 // Decode a Handshake sent by another Peer

@@ -105,9 +105,8 @@ func (t Torrent) GetAvailablePeers() ([]peers.Peer, error) {
 	pArr := []peers.Peer{}
 	for _, p := range tr.Peers {
 		pArr = append(pArr, peers.Peer{
-			IP:     net.ParseIP(p.IP),
-			Port:   p.Port,
-			Choked: true,
+			IP:   net.ParseIP(p.IP),
+			Port: p.Port,
 		})
 	}
 	return pArr, nil

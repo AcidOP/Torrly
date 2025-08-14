@@ -14,7 +14,7 @@ type hash = [20]byte
 type Peer struct {
 	IP       net.IP
 	Port     int
-	Choked   bool
+	choked   bool
 	conn     net.Conn
 	Bitfield []byte
 }
@@ -46,12 +46,12 @@ func (p *Peer) startDownloader(pieces []hash, pieceLength int) {
 	}
 
 	if msg.ID == messages.MsgUnchoke {
-		p.Choked = false
+		p.unchoke()
 	}
 
 	for i := range pieces {
-		if p.Choked {
-			fmt.Println("Peer has choked us, cannot download pieces.")
+		if p.choked {
+			fmt.Println("Peer has choked us, skipping.")
 			return
 		}
 
@@ -82,6 +82,16 @@ func (p *Peer) startDownloader(pieces []hash, pieceLength int) {
 	}
 }
 
+func (p *Peer) choke() {
+	p.choked = true
+	fmt.Printf("[Peer %s] Choked\n", p.IP.String())
+}
+
+func (p *Peer) unchoke() {
+	p.choked = false
+	fmt.Printf("[Peer %s] Unchoked\n", p.IP.String())
+}
+
 // COnnect to the associated peer using its IP and Port.
 // Returns a net.Conn if successful, or an error if it fails.
 // Returned `net.Conn` MUST be closed later by the caller.
@@ -89,14 +99,4 @@ func (p *Peer) connect() (net.Conn, error) {
 	addr := net.JoinHostPort(p.IP.String(), strconv.Itoa(p.Port))
 	timeout := time.Second * 5
 	return net.DialTimeout("tcp", addr, timeout)
-}
-
-func (p *Peer) hasBitfield(index int) bool {
-	if index < 0 || index >= len(p.Bitfield)*8 {
-		return false
-	}
-
-	byteIndex := index / 8
-	bitIndex := index % 8
-	return (p.Bitfield[byteIndex] & (1 << (7 - bitIndex))) != 0
 }
