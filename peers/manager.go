@@ -11,22 +11,14 @@ type PeerManager struct {
 	peers          []Peer
 	infoHash       []byte
 	peerId         []byte
-	pieceHashes    []hash
-	pieceLength    int
-	totalLength    int
 	connectedPeers []*Peer
 }
 
-func NewPeerManager(
-	peers []Peer, infoHash, peerId []byte, pieces []hash, pieceLength, totalLength int,
-) *PeerManager {
+func NewPeerManager(peers []Peer, infoHash, peerId []byte) *PeerManager {
 	return &PeerManager{
-		peers:       peers,
-		infoHash:    infoHash,
-		peerId:      peerId,
-		pieceHashes: pieces,
-		pieceLength: pieceLength,
-		totalLength: totalLength,
+		peers:    peers,
+		infoHash: infoHash,
+		peerId:   peerId,
 	}
 }
 
@@ -51,26 +43,13 @@ func (pm *PeerManager) HandlePeers() {
 		}
 
 		p.conn = conn // Reuse the connection for further communication
-
-		msg, err := p.receiveBitField()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		switch msg.ID {
-		case messages.MsgBitfield:
-			p.Bitfield = msg.Payload
-		case messages.MsgUnchoke:
-			p.unchoke()
-		case messages.MsgChoke:
-			p.choke()
-		default:
-			fmt.Printf("Received unexpected message ID %d from peer %s\n", msg.ID, p.IP.String())
+		if err := pm.AddPeer(*p); err != nil {
+			fmt.Printf("Error adding peer %s: %v\n", p.IP.String(), err)
+			conn.Close()
 			continue
 		}
 
-		// pm.connectedPeers = append(pm.connectedPeers, p)
-		p.startDownloader(pm.pieceHashes, pm.pieceLength)
+		go p.ReadLoop() // Start reading messages from the peer
 	}
 }
 
@@ -80,7 +59,7 @@ func (pm *PeerManager) AddPeer(p Peer) error {
 	}
 
 	// Check if the peer already exists
-	for _, existingPeer := range pm.peers {
+	for _, existingPeer := range pm.connectedPeers {
 		if existingPeer.IP.Equal(p.IP) {
 			return fmt.Errorf("peer already exists: %s", p.IP)
 		}

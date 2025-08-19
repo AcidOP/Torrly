@@ -95,9 +95,6 @@ func (t *Torrent) StartDownload() {
 		pArr,
 		t.InfoHash[:],
 		[]byte(t.PeerId),
-		t.PieceHashes,
-		t.PieceLength,
-		t.Length,
 	)
 	pm.HandlePeers()
 }

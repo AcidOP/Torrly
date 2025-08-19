@@ -30,56 +30,65 @@ func (p *Peer) Read(timeout ...time.Duration) (*messages.Message, error) {
 
 	p.conn.SetReadDeadline(time.Now().Add(duration))
 	msg, err := messages.Receive(p.conn)
+
+	fmt.Printf("\nReceived message (%s) from peer: %s\n", msg.String(), p.IP.String())
+
 	return msg, err
 }
 
-func (p *Peer) startDownloader(pieces []hash, pieceLength int) {
-	fmt.Println("\n\nRequesting pieces from: ", p.IP.String())
-
-	p.sendInterested()
-
-	// Check if the peer choked us
+func (p *Peer) ReadLoop() error {
 	msg, err := p.Read()
 	if err != nil {
-		fmt.Println("Error reading from peer:", err)
-		return
+		return err
 	}
 
-	if msg.ID == messages.MsgUnchoke {
+	switch msg.ID {
+	case messages.MsgBitfield:
+		p.Bitfield = msg.Payload
+	case messages.MsgChoke:
+		p.choke()
+	case messages.MsgUnchoke:
 		p.unchoke()
+	case messages.MsgHave:
+		fmt.Printf("Peer %s has piece %d\n", p.IP.String(), msg.Payload[:])
+	case messages.MsgPiece:
+		fmt.Printf("Received %d bytes from peer %s\n", len(msg.Payload), p.IP.String())
 	}
 
-	for i := range pieces {
-		if p.choked {
-			fmt.Println("Peer has choked us, skipping.")
-			return
-		}
+	return nil
+}
 
-		fmt.Printf("Requesting piece %d from peer %s\n", i, p.IP.String())
-
-		blockSize := 16 * 1024 // 16 KB
-		for begin := 0; begin < pieceLength; begin += blockSize {
-			length := blockSize
-			if begin+length > pieceLength {
-				length = pieceLength - begin
-			}
-
-			p.sendRequest(i, length, begin)
-
-			msg, err = p.Read()
-			if err != nil {
-				fmt.Println("Error reading piece from peer:", err)
-				return
-			}
-
-			if msg.ID != messages.MsgPiece {
-				fmt.Printf("\n[%s] Expected piece message, but got ID %d\n", p.IP.String(), msg.ID)
-				continue
-			}
-
-			fmt.Printf("\n[%s] Received %d bytes for piece %d\n", p.IP.String(), len(msg.Payload), i)
-		}
+func (p *Peer) download(pieceIndex, pieceLength int) error {
+	if p.choked {
+		fmt.Println("Peer has choked us, skipping.")
+		return fmt.Errorf("peer has choked us")
 	}
+
+	fmt.Printf("Requesting piece %d from peer %s\n", pieceIndex, p.IP.String())
+
+	blockSize := 16 * 1024 // 16 KB
+	for begin := 0; begin < pieceLength; begin += blockSize {
+		length := blockSize
+		if begin+length > pieceLength {
+			length = pieceLength - begin
+		}
+
+		p.SendRequest(pieceIndex, length, begin)
+
+		msg, err := p.Read()
+		if err != nil {
+			fmt.Println("Error reading piece from peer:", err)
+			return err
+		}
+
+		if msg.ID != messages.MsgPiece {
+			fmt.Printf("\n[%s] Expected piece message, but got ID %d\n", p.IP.String(), msg.ID)
+			continue
+		}
+
+		fmt.Printf("\n[%s] Received %d bytes for piece %d\n", p.IP.String(), len(msg.Payload), pieceIndex)
+	}
+	return nil
 }
 
 func (p *Peer) choke() {
