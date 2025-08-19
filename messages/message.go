@@ -90,6 +90,5 @@ func Receive(r io.Reader) (*Message, error) {
 		Payload: buf[1:],
 	}
 
-	fmt.Printf("Received message ID: %s\n", msg.String())
 	return msg, nil
 }
