@@ -2,6 +2,8 @@ package peers
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/AcidOP/torrly/handshake"
 	"github.com/AcidOP/torrly/messages"
@@ -29,31 +31,64 @@ func (pm *PeerManager) HandlePeers() {
 		return
 	}
 
+	var wg sync.WaitGroup
+
+	count := 1
+	success := 0
+	failed := 0
+
 	for i := range pm.peers {
+		count++
+		fmt.Printf("Connecting to peer %d/%d: %s:%d\n", count, len(pm.peers), pm.peers[i].IP.String(), pm.peers[i].Port)
 		p := &pm.peers[i]
 
-		conn, err := p.connect()
-		if err != nil || conn == nil {
+		err := p.connect()
+		if err != nil {
+			failed++
+			fmt.Println("Error connecting to peer:", err)
 			continue
 		}
 
-		if err = hs.ExchangeHandshake(conn); err != nil {
-			conn.Close()
+		if err = hs.ExchangeHandshake(p.conn); err != nil {
+			failed++
+			p.conn.Close()
+			fmt.Println("Handshake failed:", err)
 			continue
 		}
 
-		p.conn = conn // Reuse the connection for further communication
-		if err := pm.AddPeer(*p); err != nil {
+		if err := pm.AddPeer(p); err != nil {
+			failed++
 			fmt.Printf("Error adding peer %s: %v\n", p.IP.String(), err)
-			conn.Close()
+			p.conn.Close()
 			continue
 		}
+		success++
 
-		go p.ReadLoop() // Start reading messages from the peer
+		wg.Add(1)
+		go func(p *Peer) {
+			defer wg.Done()
+			if err := p.ReadLoop(); err != nil {
+				fmt.Printf("Error reading from peer %s: %v\n", p.IP.String(), err)
+				p.conn.Close()
+			}
+		}(p)
+
+		// go p.ReadLoop() // Start reading messages from the peer
 	}
+
+	wg.Wait()
+
+	fmt.Println()
+	fmt.Println("Peer connection summary:")
+	fmt.Printf("Total Peers: %d, Successful Connections: %d, Failed Connections: %d\n", len(pm.peers), success, failed)
+	fmt.Println("Connected Peers:")
+	for _, peer := range pm.connectedPeers {
+		fmt.Printf("- %s:%d\n", peer.IP.String(), peer.Port)
+	}
+	fmt.Println(strings.Repeat("-", 50))
 }
 
-func (pm *PeerManager) AddPeer(p Peer) error {
+func (pm *PeerManager) AddPeer(p *Peer) error {
 	if p.IP == nil || p.Port <= 0 || p.Port > 65535 || p.conn == nil {
 		return fmt.Errorf("invalid peer: %v", p)
 	}
@@ -65,13 +100,16 @@ func (pm *PeerManager) AddPeer(p Peer) error {
 		}
 	}
 
-	pm.peers = append(pm.peers, p)
+	pm.connectedPeers = append(pm.connectedPeers, p)
 	return nil
 }
 
 func (pm *PeerManager) RemovePeer(p Peer) error {
 	for i, existingPeer := range pm.peers {
 		if existingPeer.IP.Equal(p.IP) {
+			if existingPeer.conn != nil {
+				existingPeer.conn.Close()
+			}
 			pm.peers = append(pm.peers[:i], pm.peers[i+1:]...)
 			return nil
 		}

@@ -9,7 +9,8 @@ import (
 type MsgID = uint8
 
 const (
-	MsgChoke MsgID = iota
+	MsgKeepAlive MsgID = 255
+	MsgChoke     MsgID = iota
 	MsgUnchoke
 	MsgInterested
 	MsgNotInterested
@@ -42,6 +43,8 @@ func (msg *Message) Serialize() []byte {
 
 func (msg *Message) String() string {
 	switch msg.ID {
+	case MsgKeepAlive:
+		return "Keep Alive"
 	case MsgChoke:
 		return "Choke"
 	case MsgUnchoke:
@@ -77,7 +80,7 @@ func Receive(r io.Reader) (*Message, error) {
 
 	// keep-alive message
 	if length == 0 {
-		return nil, nil
+		return &Message{ID: MsgKeepAlive}, nil
 	}
 
 	buf := make([]byte, length)

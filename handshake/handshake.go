@@ -68,9 +68,11 @@ func (h *Handshake) ExchangeHandshake(conn net.Conn) error {
 		return fmt.Errorf("failed to send handshake: %v", err)
 	}
 
-	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	conn.SetReadDeadline(time.Now().Add(time.Second * 10))
+	defer conn.SetReadDeadline(time.Time{})
 
 	received := make([]byte, HANDSHAKE_LENGTH)
+
 	if _, err := io.ReadFull(conn, received); err != nil {
 		return fmt.Errorf("failed to read handshake response: %v", err)
 	}
@@ -88,25 +90,25 @@ func (h *Handshake) ExchangeHandshake(conn net.Conn) error {
 }
 
 // Decode a Handshake sent by another Peer
-func DecodeHandshake(buf []byte) (Handshake, error) {
+func DecodeHandshake(buf []byte) (*Handshake, error) {
 	if len(buf) != HANDSHAKE_LENGTH {
-		return Handshake{}, fmt.Errorf("invalid handshake length, expected %d bytes, got: %d",
+		return nil, fmt.Errorf("invalid handshake length, expected %d bytes, got: %d",
 			HANDSHAKE_LENGTH, len(buf))
 	}
 
 	protoLength := int(buf[0])
 	if protoLength != PROTOCOL_LENGTH {
-		return Handshake{}, fmt.Errorf("invalid protocol length: expected %d, got %d",
+		return nil, fmt.Errorf("invalid protocol length: expected %d, got %d",
 			PROTOCOL_LENGTH, protoLength)
 	}
 
 	protoStr := string(buf[1 : 1+protoLength])
 	if protoStr != PROTOCOL_STRING {
-		return Handshake{}, fmt.Errorf("invalid protocol string: expected %q, got %q",
+		return nil, fmt.Errorf("invalid protocol string: expected %q, got %q",
 			PROTOCOL_STRING, protoStr)
 	}
 
-	h := Handshake{
+	h := &Handshake{
 		pLength:   protoLength,
 		pStr:      protoStr,
 		pReserved: buf[20:28],
@@ -117,7 +119,7 @@ func DecodeHandshake(buf []byte) (Handshake, error) {
 	return h, nil
 }
 
-func (h *Handshake) VerifyHandshake(h2 Handshake) error {
+func (h *Handshake) VerifyHandshake(h2 *Handshake) error {
 	if h2.pLength != PROTOCOL_LENGTH {
 		return fmt.Errorf("protocol length mismatch: expected %d, got %d",
 			PROTOCOL_LENGTH, h2.pLength)

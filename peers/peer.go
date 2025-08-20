@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AcidOP/torrly/messages"
 )
-
-type hash = [20]byte
 
 type Peer struct {
 	IP       net.IP
@@ -29,33 +28,41 @@ func (p *Peer) Read(timeout ...time.Duration) (*messages.Message, error) {
 	}
 
 	p.conn.SetReadDeadline(time.Now().Add(duration))
-	msg, err := messages.Receive(p.conn)
+	defer p.conn.SetReadDeadline(time.Time{})
 
-	fmt.Printf("\nReceived message (%s) from peer: %s\n", msg.String(), p.IP.String())
-
-	return msg, err
+	return messages.Receive(p.conn)
 }
 
 func (p *Peer) ReadLoop() error {
-	msg, err := p.Read()
-	if err != nil {
-		return err
-	}
+	for {
+		msg, err := p.Read(time.Second * 10)
+		if err != nil {
+			p.conn.Close()
+			return err
+		}
 
-	switch msg.ID {
-	case messages.MsgBitfield:
-		p.Bitfield = msg.Payload
-	case messages.MsgChoke:
-		p.choke()
-	case messages.MsgUnchoke:
-		p.unchoke()
-	case messages.MsgHave:
-		fmt.Printf("Peer %s has piece %d\n", p.IP.String(), msg.Payload[:])
-	case messages.MsgPiece:
-		fmt.Printf("Received %d bytes from peer %s\n", len(msg.Payload), p.IP.String())
+		switch msg.ID {
+		case messages.MsgKeepAlive:
+			fmt.Println("Received keep-alive message from peer:", p.IP.String())
+			continue
+		case messages.MsgBitfield:
+			p.Bitfield = msg.Payload
+		case messages.MsgChoke:
+			p.choke()
+			return nil
+		case messages.MsgUnchoke:
+			p.unchoke()
+		case messages.MsgHave:
+			fmt.Printf("Peer %s has piece %d\n", p.IP.String(), len(msg.Payload))
+		case messages.MsgPiece:
+			fmt.Printf("Received %d bytes from peer %s\n", len(msg.Payload), p.IP.String())
+		case messages.MsgNotInterested:
+			fmt.Printf("Peer %s is not interested\n", p.IP.String())
+			return nil
+		default:
+			return fmt.Errorf("unknown message ID %d from peer %s", msg.ID, p.IP.String())
+		}
 	}
-
-	return nil
 }
 
 func (p *Peer) download(pieceIndex, pieceLength int) error {
@@ -73,11 +80,12 @@ func (p *Peer) download(pieceIndex, pieceLength int) error {
 			length = pieceLength - begin
 		}
 
-		p.SendRequest(pieceIndex, length, begin)
+		if err := p.SendRequest(pieceIndex, length, begin); err != nil {
+			return err
+		}
 
 		msg, err := p.Read()
 		if err != nil {
-			fmt.Println("Error reading piece from peer:", err)
 			return err
 		}
 
@@ -102,10 +110,20 @@ func (p *Peer) unchoke() {
 }
 
 // COnnect to the associated peer using its IP and Port.
-// Returns a net.Conn if successful, or an error if it fails.
-// Returned `net.Conn` MUST be closed later by the caller.
-func (p *Peer) connect() (net.Conn, error) {
+// Attaches the connection to the `peer` struct which MUST
+// be closed by the caller later in the program.
+func (p *Peer) connect() error {
 	addr := net.JoinHostPort(p.IP.String(), strconv.Itoa(p.Port))
-	timeout := time.Second * 5
-	return net.DialTimeout("tcp", addr, timeout)
+	c, err := net.DialTimeout("tcp", addr, time.Second*5)
+	if err != nil {
+		return err
+	}
+
+	p.conn = c
+
+	fmt.Println(strings.Repeat("-", 50))
+	fmt.Printf("Connected to peer: %s\n", p.IP.String())
+	fmt.Println(strings.Repeat("-", 50))
+
+	return nil
 }

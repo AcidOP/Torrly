@@ -49,7 +49,7 @@ func (p *Peer) SendInterested() error {
 // length: The length (normally 16 KB) of the piece to request.
 // begin: The offset within the piece to start the request.
 // https://wiki.theory.org/BitTorrentSpecification#Messages
-func (p *Peer) SendRequest(index, length, begin int) {
+func (p *Peer) SendRequest(index, length, begin int) error {
 	msg := messages.Message{
 		ID:      messages.MsgRequest,
 		Payload: make([]byte, 12),
@@ -60,5 +60,7 @@ func (p *Peer) SendRequest(index, length, begin int) {
 
 	if err := p.send(&msg); err != nil {
 		fmt.Println("Error writing request:", err)
+		return fmt.Errorf("failed to send request message: %w", err)
 	}
+	return nil
 }
