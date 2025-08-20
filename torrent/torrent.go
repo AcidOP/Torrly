@@ -109,11 +109,7 @@ func parseTorrentFromPath(path string) (*os.File, error) {
 		return nil, errors.New("file " + f.Name() + " is not a .torrent file")
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	return file, nil
+	return os.Open(path)
 }
 
 // Takes a file as argument and reads the torrent metadata from it.
