@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -15,21 +16,21 @@ import (
 type hash = [20]byte
 
 type Torrent struct {
+	Name        string
 	Announce    string
 	InfoHash    hash
-	PieceHashes []hash
-	PieceLength int
-	Length      int
-	Name        string
+	PieceHashes []hash // Array of 20-byte hashes for each piece
+	PieceLength int    // Number of bytes in each piece (e.g. 16 KB)
+	Length      int    // Total length of the file in bytes
 	PeerId      string // Our own Peer ID, used for handshakes.
 	Port        int    // Port we listen on for incoming connections
 }
 
 type bcodeInfo struct {
-	Pieces      string `bencode:"pieces"`
-	PieceLength int    `bencode:"piece length"`
-	Length      int    `bencode:"length"`
 	Name        string `bencode:"name"`
+	Pieces      string `bencode:"pieces"`       // Concatenated SHA1 hashes of each piece
+	PieceLength int    `bencode:"piece length"` // Length of each piece in bytes (e.g. 16 KB)
+	Length      int    `bencode:"length"`       // Total length of the file in bytes
 }
 
 type bcodeTorrent struct {
@@ -169,9 +170,16 @@ func (i bcodeInfo) splitPieceHashes() ([]hash, error) {
 	}
 
 	numHashes := len(i.Pieces) / hashLen
+	expectedNumHashes := int(math.Ceil(float64(i.Length) / float64(i.PieceLength)))
+
+	if numHashes != expectedNumHashes {
+		return nil, fmt.Errorf("piece count mismatch: got %d hashes, expected %d (file size=%d, piece size=%d)",
+			numHashes, expectedNumHashes, i.Length, i.PieceLength)
+	}
+
 	hashes := make([]hash, numHashes)
 
-	for idx := range numHashes {
+	for idx := 0; idx < numHashes; idx++ {
 		copy(hashes[idx][:], i.Pieces[idx*hashLen:(idx+1)*hashLen])
 	}
 	return hashes, nil

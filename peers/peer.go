@@ -46,19 +46,19 @@ func (p *Peer) ReadLoop() error {
 			fmt.Println("Received keep-alive message from peer:", p.IP.String())
 			continue
 		case messages.MsgBitfield:
-			p.Bitfield = msg.Payload
+			p.setBitfield(msg.Payload)
 		case messages.MsgChoke:
 			p.choke()
-			return nil
 		case messages.MsgUnchoke:
 			p.unchoke()
+			p.SendInterested()
 		case messages.MsgHave:
+			p.SendInterested()
 			fmt.Printf("Peer %s has piece %d\n", p.IP.String(), len(msg.Payload))
 		case messages.MsgPiece:
 			fmt.Printf("Received %d bytes from peer %s\n", len(msg.Payload), p.IP.String())
 		case messages.MsgNotInterested:
 			fmt.Printf("Peer %s is not interested\n", p.IP.String())
-			return nil
 		default:
 			return fmt.Errorf("unknown message ID %d from peer %s", msg.ID, p.IP.String())
 		}
@@ -107,6 +107,11 @@ func (p *Peer) choke() {
 func (p *Peer) unchoke() {
 	p.choked = false
 	fmt.Printf("[Peer %s] Unchoked\n", p.IP.String())
+}
+
+func (p *Peer) setBitfield(bf []byte) error {
+	p.Bitfield = append(p.Bitfield, bf...)
+	return nil
 }
 
 // COnnect to the associated peer using its IP and Port.

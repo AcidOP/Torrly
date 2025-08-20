@@ -14,26 +14,6 @@ func (p *Peer) send(msg *messages.Message) error {
 	return err
 }
 
-func (p *Peer) ReceiveBitField() (*messages.Message, error) {
-	msg, err := messages.Receive(p.conn)
-	if err != nil {
-		return nil, err
-	}
-
-	if msg.ID != messages.MsgBitfield {
-		fmt.Printf("\n\n[%s] Peer did not send a bitfield message\n\n", p.IP.String())
-		return nil, nil
-	}
-
-	if len(msg.Payload) == 0 {
-		return nil, fmt.Errorf("received empty bitfield payload from peer %s", p.IP.String())
-	}
-
-	// fmt.Printf("\nReceived Bitfield: %x\n\n", msg.Payload)
-
-	return msg, nil
-}
-
 func (p *Peer) SendInterested() error {
 	msg := messages.Message{ID: messages.MsgInterested}
 	if err := p.send(&msg); err != nil {
