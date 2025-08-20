@@ -49,11 +49,7 @@ func NewTorrentFromFile(path string) (*Torrent, error) {
 	}
 	defer file.Close()
 
-	torrentFile, err := metaFromFile(file)
-	if err != nil {
-		return nil, err
-	}
-	return torrentFile, nil
+	return metaFromFile(file)
 }
 
 // Visualize information about the torrent.
