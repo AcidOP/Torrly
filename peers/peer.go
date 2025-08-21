@@ -33,6 +33,8 @@ func (p *Peer) Read(timeout ...time.Duration) (*messages.Message, error) {
 	return messages.Receive(p.conn)
 }
 
+// ReadLoop continuously reads messages from the peer until an error occurs.
+// This call blocks until a message is received or an error occurs.
 func (p *Peer) ReadLoop() error {
 	for {
 		msg, err := p.Read(time.Second * 10)
@@ -53,7 +55,6 @@ func (p *Peer) ReadLoop() error {
 			p.unchoke()
 			p.SendInterested()
 		case messages.MsgHave:
-			p.SendInterested()
 			fmt.Printf("Peer %s has piece %d\n", p.IP.String(), len(msg.Payload))
 		case messages.MsgPiece:
 			fmt.Printf("Received %d bytes from peer %s\n", len(msg.Payload), p.IP.String())

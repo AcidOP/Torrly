@@ -2,7 +2,6 @@ package peers
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/AcidOP/torrly/handshake"
@@ -33,36 +32,25 @@ func (pm *PeerManager) HandlePeers() {
 
 	var wg sync.WaitGroup
 
-	count := 1
-	success := 0
-	failed := 0
-
 	for i := range pm.peers {
-		count++
-		fmt.Printf("Connecting to peer %d/%d: %s:%d\n", count, len(pm.peers), pm.peers[i].IP.String(), pm.peers[i].Port)
 		p := &pm.peers[i]
 
-		err := p.connect()
-		if err != nil {
-			failed++
+		if err := p.connect(); err != nil {
 			fmt.Println("Error connecting to peer:", err)
 			continue
 		}
 
 		if err = hs.ExchangeHandshake(p.conn); err != nil {
-			failed++
 			p.conn.Close()
 			fmt.Println("Handshake failed:", err)
 			continue
 		}
 
 		if err := pm.AddPeer(p); err != nil {
-			failed++
 			fmt.Printf("Error adding peer %s: %v\n", p.IP.String(), err)
 			p.conn.Close()
 			continue
 		}
-		success++
 
 		wg.Add(1)
 		go func(p *Peer) {
@@ -72,20 +60,9 @@ func (pm *PeerManager) HandlePeers() {
 				p.conn.Close()
 			}
 		}(p)
-
-		// go p.ReadLoop() // Start reading messages from the peer
 	}
 
 	wg.Wait()
-
-	fmt.Println()
-	fmt.Println("Peer connection summary:")
-	fmt.Printf("Total Peers: %d, Successful Connections: %d, Failed Connections: %d\n", len(pm.peers), success, failed)
-	fmt.Println("Connected Peers:")
-	for _, peer := range pm.connectedPeers {
-		fmt.Printf("- %s:%d\n", peer.IP.String(), peer.Port)
-	}
-	fmt.Println(strings.Repeat("-", 50))
 }
 
 func (pm *PeerManager) AddPeer(p *Peer) error {
