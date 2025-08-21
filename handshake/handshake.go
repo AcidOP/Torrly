@@ -82,11 +82,7 @@ func (h *Handshake) ExchangeHandshake(conn net.Conn) error {
 		return fmt.Errorf("failed to decode handshake: %v", err)
 	}
 
-	if err := h.VerifyHandshake(hs); err != nil {
-		return fmt.Errorf("handshake verification failed: %v", err)
-	}
-
-	return nil
+	return h.VerifyHandshake(hs)
 }
 
 // Decode a Handshake sent by another Peer

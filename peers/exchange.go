@@ -16,12 +16,7 @@ func (p *Peer) send(msg *messages.Message) error {
 
 func (p *Peer) SendInterested() error {
 	msg := messages.Message{ID: messages.MsgInterested}
-	if err := p.send(&msg); err != nil {
-		return fmt.Errorf("failed to send interested message: %w", err)
-	}
-
-	fmt.Println("Sent `interested` message to peer:", p.IP.String())
-	return nil
+	return p.send(&msg)
 }
 
 // sendRequest sends a request message to the peer for a specific piece.
@@ -38,9 +33,5 @@ func (p *Peer) SendRequest(index, length, begin int) error {
 	binary.BigEndian.PutUint32(msg.Payload[4:8], uint32(begin))
 	binary.BigEndian.PutUint32(msg.Payload[8:12], uint32(length))
 
-	if err := p.send(&msg); err != nil {
-		fmt.Println("Error writing request:", err)
-		return fmt.Errorf("failed to send request message: %w", err)
-	}
-	return nil
+	return p.send(&msg)
 }
