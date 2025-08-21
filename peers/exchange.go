@@ -8,10 +8,11 @@ import (
 )
 
 func (p *Peer) send(msg *messages.Message) error {
-	_, err := p.conn.Write(msg.Serialize())
-
-	fmt.Printf("\nSent message (%s) to peer: %s\n", msg.String(), p.IP.String())
-	return err
+	if _, err := p.conn.Write(msg.Serialize()); err != nil {
+		return err
+	}
+	fmt.Printf("\nSent message (%s) to peer: %s\n", msg, p.IP)
+	return nil
 }
 
 func (p *Peer) SendInterested() error {
