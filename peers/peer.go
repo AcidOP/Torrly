@@ -15,7 +15,7 @@ type Peer struct {
 	Port     int
 	choked   bool
 	conn     net.Conn
-	Bitfield []byte
+	Bitfield []bool
 }
 
 // Read function reads a `messages.Message` from the peer's connection.
@@ -48,12 +48,11 @@ func (p *Peer) ReadLoop() error {
 			fmt.Println("Received keep-alive message from peer:", p.IP.String())
 			continue
 		case messages.MsgBitfield:
-			p.setBitfield(msg.Payload)
+			p.setBitfield(bytesToBoolSlice(msg.Payload))
 		case messages.MsgChoke:
 			p.choke()
 		case messages.MsgUnchoke:
 			p.unchoke()
-			p.SendInterested()
 		case messages.MsgHave:
 			fmt.Printf("Peer %s has piece %d\n", p.IP.String(), len(msg.Payload))
 		case messages.MsgPiece:
@@ -110,9 +109,20 @@ func (p *Peer) unchoke() {
 	fmt.Printf("[Peer %s] Unchoked\n", p.IP.String())
 }
 
-func (p *Peer) setBitfield(bf []byte) error {
+func (p *Peer) setBitfield(bf []bool) error {
 	p.Bitfield = append(p.Bitfield, bf...)
 	return nil
+}
+
+// bytesToBoolSlice helper func converts a []byte bitfield to a []bool slice.
+func bytesToBoolSlice(bf []byte) []bool {
+	bools := make([]bool, 0, len(bf)*8)
+	for _, b := range bf {
+		for i := 7; i >= 0; i-- {
+			bools = append(bools, (b>>i)&1 == 1)
+		}
+	}
+	return bools
 }
 
 // COnnect to the associated peer using its IP and Port.
