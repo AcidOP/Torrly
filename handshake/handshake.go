@@ -38,7 +38,7 @@ func NewHandshake(infoHash, peerID []byte) (*Handshake, error) {
 	return &Handshake{
 		pLength:   PROTOCOL_LENGTH,
 		pStr:      PROTOCOL_STRING,
-		pReserved: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		pReserved: bytes.Repeat([]byte{0x00}, RESERVED_LENGTH),
 		InfoHash:  infoHash,
 		PeerID:    peerID,
 	}, nil
