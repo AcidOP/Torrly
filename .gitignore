@@ -4,8 +4,9 @@
 # Any build files generated
 *.exe
 
-# Any torrent files for testing
+# Any torrent or zip files for testing
 *.torrent
+*.zip
 
 .idea
 *.txt

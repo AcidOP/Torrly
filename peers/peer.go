@@ -16,6 +16,7 @@ type Peer struct {
 	choked   bool
 	conn     net.Conn
 	Bitfield []bool
+	Incoming chan *messages.Message
 }
 
 // Read function reads a `messages.Message` from the peer's connection.
@@ -36,6 +37,7 @@ func (p *Peer) Read(timeout ...time.Duration) (*messages.Message, error) {
 // ReadLoop continuously reads messages from the peer until an error occurs.
 // This call blocks until a message is received or an error occurs.
 func (p *Peer) ReadLoop() error {
+	p.SendInterested()
 	for {
 		msg, err := p.Read(time.Second * 10)
 		if err != nil {
@@ -49,16 +51,20 @@ func (p *Peer) ReadLoop() error {
 			continue
 		case messages.MsgBitfield:
 			p.setBitfield(bytesToBoolSlice(msg.Payload))
+			fmt.Println("\nReceived bitfield from peer:", p.IP.String())
 		case messages.MsgChoke:
-			// p.choke()
 			fmt.Printf("Peer %s has choked us\n", p.IP.String())
+			p.choke()
 		case messages.MsgUnchoke:
-			p.unchoke()
 			fmt.Printf("Peer %s has unchoked us\n", p.IP.String())
+			p.unchoke()
 		case messages.MsgHave:
 			fmt.Printf("Peer %s has piece %d\n", p.IP.String(), len(msg.Payload))
 		case messages.MsgPiece:
 			fmt.Printf("Received %d bytes from peer %s\n", len(msg.Payload), p.IP.String())
+		case messages.MsgInterested:
+			fmt.Printf("Peer %s is interested\n", p.IP.String())
+			p.unchoke()
 		case messages.MsgNotInterested:
 			fmt.Printf("Peer %s is not interested\n", p.IP.String())
 		default:
@@ -67,39 +73,39 @@ func (p *Peer) ReadLoop() error {
 	}
 }
 
-func (p *Peer) download(pieceIndex, pieceLength int) error {
-	if p.choked {
-		fmt.Println("Peer has choked us, skipping.")
-		return fmt.Errorf("peer has choked us")
-	}
+// func (p *Peer) download(pieceIndex, pieceLength int) error {
+// 	if p.choked {
+// 		fmt.Println("Peer has choked us, skipping.")
+// 		return fmt.Errorf("peer has choked us")
+// 	}
 
-	fmt.Printf("Requesting piece %d from peer %s\n", pieceIndex, p.IP.String())
+// 	fmt.Printf("Requesting piece %d from peer %s\n", pieceIndex, p.IP.String())
 
-	blockSize := 16 * 1024 // 16 KB
-	for begin := 0; begin < pieceLength; begin += blockSize {
-		length := blockSize
-		if begin+length > pieceLength {
-			length = pieceLength - begin
-		}
+// 	blockSize := 16 * 1024 // 16 KB
+// 	for begin := 0; begin < pieceLength; begin += blockSize {
+// 		length := blockSize
+// 		if begin+length > pieceLength {
+// 			length = pieceLength - begin
+// 		}
 
-		if err := p.SendRequest(pieceIndex, length, begin); err != nil {
-			return err
-		}
+// 		if err := p.SendRequest(pieceIndex, length, begin); err != nil {
+// 			return err
+// 		}
 
-		msg, err := p.Read()
-		if err != nil {
-			return err
-		}
+// 		msg, err := p.Read()
+// 		if err != nil {
+// 			return err
+// 		}
 
-		if msg.ID != messages.MsgPiece {
-			fmt.Printf("\n[%s] Expected piece message, but got ID %d\n", p.IP.String(), msg.ID)
-			continue
-		}
+// 		if msg.ID != messages.MsgPiece {
+// 			fmt.Printf("\n[%s] Expected piece message, but got ID %d\n", p.IP.String(), msg.ID)
+// 			continue
+// 		}
 
-		fmt.Printf("\n[%s] Received %d bytes for piece %d\n", p.IP.String(), len(msg.Payload), pieceIndex)
-	}
-	return nil
-}
+// 		fmt.Printf("\n[%s] Received %d bytes for piece %d\n", p.IP.String(), len(msg.Payload), pieceIndex)
+// 	}
+// 	return nil
+// }
 
 func (p *Peer) choke() {
 	p.choked = true
@@ -112,7 +118,7 @@ func (p *Peer) unchoke() {
 }
 
 func (p *Peer) setBitfield(bf []bool) error {
-	p.Bitfield = append(p.Bitfield, bf...)
+	p.Bitfield = bf
 	return nil
 }
 

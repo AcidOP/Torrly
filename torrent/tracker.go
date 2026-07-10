@@ -54,6 +54,10 @@ func (t Torrent) buildTrackerURL() (string, error) {
 		return "", err
 	}
 
+	if t.Announce == "" {
+		return "", errors.New("announce URL is empty")
+	}
+
 	params := url.Values{
 		"info_hash":  {string(t.InfoHash[:])},
 		"peer_id":    {t.PeerId},
@@ -101,6 +105,7 @@ func (t Torrent) GetAvailablePeers() ([]peers.Peer, error) {
 	}
 
 	tr.Show()
+	t.interval = tr.Interval
 
 	pArr := []peers.Peer{}
 	for _, p := range tr.Peers {

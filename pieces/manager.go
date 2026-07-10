@@ -6,7 +6,7 @@ type bitfield []bool
 
 type PieceManager struct {
 	Pieces      []*Piece
-	Bitfield    bitfield // Our very own bitfield to track completed pieces
+	Bitfield    bitfield
 	Length      int
 	PieceLength int
 	Pending     map[int]bool // Tracks pieces that are currently being downloaded

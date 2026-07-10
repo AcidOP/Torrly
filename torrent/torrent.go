@@ -24,6 +24,7 @@ type Torrent struct {
 	Length      int    // Total length of the file in bytes
 	PeerId      string // Our own Peer ID, used for handshakes.
 	Port        int    // Port we listen on for incoming connections
+	interval    int    // Interval in seconds for tracker updates
 }
 
 type bcodeInfo struct {
@@ -34,8 +35,9 @@ type bcodeInfo struct {
 }
 
 type bcodeTorrent struct {
-	Announce string    `bencode:"announce"`
-	Info     bcodeInfo `bencode:"info"`
+	Announce     string     `bencode:"announce"`
+	AnnounceList [][]string `bencode:"announce-list"`
+	Info         bcodeInfo  `bencode:"info"`
 }
 
 const (
@@ -131,6 +133,18 @@ func metaFromFile(f *os.File) (*Torrent, error) {
 		return nil, errors.New("failed to parse torrent file: " + err.Error())
 	}
 
+	announce := bt.Announce
+
+	// Select the HTTP tracker
+	for _, tier := range bt.AnnounceList {
+		for _, url := range tier {
+			if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+				announce = url
+				break
+			}
+		}
+	}
+
 	// SHA1 hash of `info` dictionary
 	iHash := bt.Info.hash()
 
@@ -141,7 +155,7 @@ func metaFromFile(f *os.File) (*Torrent, error) {
 	}
 
 	t := &Torrent{
-		Announce:    bt.Announce,
+		Announce:    announce,
 		InfoHash:    iHash,
 		PieceHashes: pHashes,
 		PieceLength: bt.Info.PieceLength,

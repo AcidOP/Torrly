@@ -2,7 +2,6 @@ package peers
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/AcidOP/torrly/handshake"
 	"github.com/AcidOP/torrly/messages"
@@ -30,7 +29,7 @@ func (pm *PeerManager) HandlePeers() {
 		return
 	}
 
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 
 	// This does the error thing
 	handleErr := func(p *Peer, err error, msg string) bool {
@@ -59,17 +58,16 @@ func (pm *PeerManager) HandlePeers() {
 			continue
 		}
 
-		wg.Add(1)
-		go func(p *Peer) {
-			defer wg.Done()
-			p.SendInterested()
+		// wg.Add(1)
+		func(p *Peer) {
+			// defer wg.Done()
 			if err := p.ReadLoop(); err != nil {
 				handleErr(p, err, fmt.Sprintf("Error reading from peer %s", p.IP.String()))
 			}
 		}(peer)
 	}
 
-	wg.Wait()
+	// wg.Wait()
 }
 
 func (pm *PeerManager) AddPeer(p *Peer) error {
