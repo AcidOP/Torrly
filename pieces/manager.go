@@ -29,14 +29,14 @@ func NewPieceManager(hashes []hash, bfield []bool, length, pieceLength int) *Pie
 	return pm
 }
 
-func (pm *PieceManager) NextPiece(peerBField bitfield) *Piece {
-	for i := 0; i < len(pm.Pieces); i++ {
-		if peerBField.Has(i) && !pm.Bitfield.Has(i) && !pm.Pending[i] {
-			return pm.Pieces[i]
-		}
-	}
-	return nil
-}
+// func (pm *PieceManager) NextPiece(peerBField bitfield) *Piece {
+// 	for i := 0; i < len(pm.Pieces); i++ {
+// 		if peerBField.Has(i) && !pm.Bitfield.Has(i) && !pm.Pending[i] {
+// 			return pm.Pieces[i]
+// 		}
+// 	}
+// 	return nil
+// }
 
 func (pm *PieceManager) MarkComplete(piece *Piece) error {
 	if piece.index < 0 || piece.index >= len(pm.Pieces) {
@@ -50,11 +50,4 @@ func (pm *PieceManager) MarkComplete(piece *Piece) error {
 	pm.Bitfield[piece.index] = true
 
 	return nil
-}
-
-func (bf bitfield) Has(index int) bool {
-	if index < 0 || index > len(bf) {
-		return false
-	}
-	return bf[index]
 }

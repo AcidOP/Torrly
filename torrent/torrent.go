@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AcidOP/torrly/peers"
 	"github.com/jackpal/bencode-go"
 )
 
@@ -90,20 +89,20 @@ func (t *Torrent) FirstTwentyHashes() {
 	}
 }
 
-func (t *Torrent) StartDownload() {
-	pArr, err := t.GetAvailablePeers()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+// func (t *Torrent) StartDownload() {
+// 	pArr, err := t.GetAvailablePeers()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return
+// 	}
 
-	pm := peers.NewPeerManager(
-		pArr,
-		t.InfoHash[:],
-		[]byte(t.PeerId),
-	)
-	pm.HandlePeers()
-}
+// 	pm := peers.NewPeerManager(
+// 		pArr,
+// 		t.InfoHash[:],
+// 		[]byte(t.PeerId),
+// 	)
+// 	pm.HandlePeers()
+// }
 
 // Takes a path as an argument and checks if the file is a .torrent file.
 // Then reads the file and a pointer to the file.

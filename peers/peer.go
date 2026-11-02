@@ -19,21 +19,6 @@ type Peer struct {
 	Incoming chan *messages.Message
 }
 
-// Read function reads a `messages.Message` from the peer's connection.
-// (Optionally) accepts a timeout duration to set a read deadline.
-// If no timeout is provided, it defaults to 2 minutes.
-func (p *Peer) Read(timeout ...time.Duration) (*messages.Message, error) {
-	duration := 120 * time.Second
-	if len(timeout) > 0 {
-		duration = timeout[0]
-	}
-
-	p.conn.SetReadDeadline(time.Now().Add(duration))
-	defer p.conn.SetReadDeadline(time.Time{})
-
-	return messages.Receive(p.conn)
-}
-
 // ReadLoop continuously reads messages from the peer until an error occurs.
 // This call blocks until a message is received or an error occurs.
 func (p *Peer) ReadLoop() error {
@@ -120,17 +105,6 @@ func (p *Peer) unchoke() {
 func (p *Peer) setBitfield(bf []bool) error {
 	p.Bitfield = bf
 	return nil
-}
-
-// bytesToBoolSlice helper func converts a []byte bitfield to a []bool slice.
-func bytesToBoolSlice(bf []byte) []bool {
-	bools := make([]bool, 0, len(bf)*8)
-	for _, b := range bf {
-		for i := 7; i >= 0; i-- {
-			bools = append(bools, (b>>i)&1 == 1)
-		}
-	}
-	return bools
 }
 
 // COnnect to the associated peer using its IP and Port.
